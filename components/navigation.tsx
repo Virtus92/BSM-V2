@@ -10,22 +10,14 @@ import { cn } from "@/lib/utils";
 import { 
   Menu, 
   X, 
-  Users, 
-  FileText, 
   BarChart3, 
   MessageSquare,
-  Home,
-  Briefcase,
-  Receipt
+  Home
 } from "lucide-react";
 
 const navigationItems = [
-  { name: "Dashboard", href: "/", icon: Home },
-  { name: "CRM", href: "/crm", icon: Users },
-  { name: "Projekte", href: "/projects", icon: BarChart3 },
-  { name: "Dokumente", href: "/documents", icon: FileText },
-  { name: "Angebote", href: "/quotes", icon: Receipt },
-  { name: "Verträge", href: "/contracts", icon: Briefcase },
+  { name: "Home", href: "/", icon: Home },
+  { name: "Dashboard", href: "/dashboard", icon: BarChart3 },
   { name: "Kontakt", href: "/contact", icon: MessageSquare },
 ];
 
