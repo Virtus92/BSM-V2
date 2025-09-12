@@ -1,105 +1,244 @@
-<a href="https://demo-nextjs-with-supabase.vercel.app/">
-  <img alt="Next.js and Supabase Starter Kit - the fastest way to build apps with Next.js and Supabase" src="https://demo-nextjs-with-supabase.vercel.app/opengraph-image.png">
-  <h1 align="center">Next.js and Supabase Starter Kit</h1>
-</a>
+# Rising BSM V2
 
-<p align="center">
- The fastest way to build apps with Next.js and Supabase
-</p>
+> Business Service Management Platform - Next Generation
+
+A modern, scalable Business Service Management platform built with Next.js 15, Supabase, and TypeScript. Rising BSM V2 provides comprehensive service management capabilities with enterprise-grade security and performance.
 
 <p align="center">
   <a href="#features"><strong>Features</strong></a> ·
-  <a href="#demo"><strong>Demo</strong></a> ·
-  <a href="#deploy-to-vercel"><strong>Deploy to Vercel</strong></a> ·
-  <a href="#clone-and-run-locally"><strong>Clone and run locally</strong></a> ·
-  <a href="#feedback-and-issues"><strong>Feedback and issues</strong></a>
-  <a href="#more-supabase-examples"><strong>More Examples</strong></a>
+  <a href="#tech-stack"><strong>Tech Stack</strong></a> ·
+  <a href="#quick-start"><strong>Quick Start</strong></a> ·
+  <a href="#deployment"><strong>Deployment</strong></a> ·
+  <a href="#contributing"><strong>Contributing</strong></a>
 </p>
-<br/>
 
-## Features
+## 🚀 Features
 
-- Works across the entire [Next.js](https://nextjs.org) stack
-  - App Router
-  - Pages Router
-  - Middleware
-  - Client
-  - Server
-  - It just works!
-- supabase-ssr. A package to configure Supabase Auth to use cookies
-- Password-based authentication block installed via the [Supabase UI Library](https://supabase.com/ui/docs/nextjs/password-based-auth)
-- Styling with [Tailwind CSS](https://tailwindcss.com)
-- Components with [shadcn/ui](https://ui.shadcn.com/)
-- Optional deployment with [Supabase Vercel Integration and Vercel deploy](#deploy-your-own)
-  - Environment variables automatically assigned to Vercel project
+- **Modern Tech Stack**: Next.js 15 with App Router, React 19, TypeScript
+- **Authentication**: Cookie-based auth with Supabase SSR support
+- **Responsive Design**: Built with Tailwind CSS and shadcn/ui components
+- **Testing**: Comprehensive test suite with Jest and React Testing Library
+- **CI/CD**: Automated testing, building, and deployment with GitHub Actions
+- **Containerization**: Docker support for consistent deployments
+- **Type Safety**: Full TypeScript integration with strict configuration
 
-## Demo
+## 🛠 Tech Stack
 
-You can view a fully working demo at [demo-nextjs-with-supabase.vercel.app](https://demo-nextjs-with-supabase.vercel.app/).
+- **Framework**: Next.js 15 with App Router
+- **Database & Auth**: Supabase with SSR support
+- **Styling**: Tailwind CSS with shadcn/ui components
+- **Language**: TypeScript with strict configuration
+- **Testing**: Jest + React Testing Library
+- **Deployment**: Docker + GitHub Actions
+- **Theme**: next-themes with system preference detection
 
-## Deploy to Vercel
+## 🏃‍♂️ Quick Start
 
-Vercel deployment will guide you through creating a Supabase account and project.
+### Prerequisites
 
-After installation of the Supabase integration, all relevant environment variables will be assigned to the project so the deployment is fully functioning.
+- Node.js 20 or higher
+- npm or yarn
+- Supabase account
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fvercel%2Fnext.js%2Ftree%2Fcanary%2Fexamples%2Fwith-supabase&project-name=nextjs-with-supabase&repository-name=nextjs-with-supabase&demo-title=nextjs-with-supabase&demo-description=This+starter+configures+Supabase+Auth+to+use+cookies%2C+making+the+user%27s+session+available+throughout+the+entire+Next.js+app+-+Client+Components%2C+Server+Components%2C+Route+Handlers%2C+Server+Actions+and+Middleware.&demo-url=https%3A%2F%2Fdemo-nextjs-with-supabase.vercel.app%2F&external-id=https%3A%2F%2Fgithub.com%2Fvercel%2Fnext.js%2Ftree%2Fcanary%2Fexamples%2Fwith-supabase&demo-image=https%3A%2F%2Fdemo-nextjs-with-supabase.vercel.app%2Fopengraph-image.png)
+### Installation
 
-The above will also clone the Starter kit to your GitHub, you can clone that locally and develop locally.
-
-If you wish to just develop locally and not deploy to Vercel, [follow the steps below](#clone-and-run-locally).
-
-## Clone and run locally
-
-1. You'll first need a Supabase project which can be made [via the Supabase dashboard](https://database.new)
-
-2. Create a Next.js app using the Supabase Starter template npx command
-
+1. **Clone the repository**
    ```bash
-   npx create-next-app --example with-supabase with-supabase-app
+   git clone https://github.com/your-username/rising-bsm-v2.git
+   cd rising-bsm-v2
    ```
 
+2. **Install dependencies**
    ```bash
-   yarn create next-app --example with-supabase with-supabase-app
+   npm install
    ```
 
+3. **Environment setup**
    ```bash
-   pnpm create next-app --example with-supabase with-supabase-app
+   cp .env.example .env.local
+   ```
+   
+   Update `.env.local` with your Supabase credentials:
+   ```env
+   NEXT_PUBLIC_SUPABASE_URL=your-project-url
+   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY=your-anon-key
    ```
 
-3. Use `cd` to change into the app's directory
-
-   ```bash
-   cd with-supabase-app
-   ```
-
-4. Rename `.env.example` to `.env.local` and update the following:
-
-   ```
-   NEXT_PUBLIC_SUPABASE_URL=[INSERT SUPABASE PROJECT URL]
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=[INSERT SUPABASE PROJECT API ANON KEY]
-   ```
-
-   Both `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` can be found in [your Supabase project's API settings](https://supabase.com/dashboard/project/_?showConnect=true)
-
-5. You can now run the Next.js local development server:
-
+4. **Start development server**
    ```bash
    npm run dev
    ```
 
-   The starter kit should now be running on [localhost:3000](http://localhost:3000/).
+   Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-6. This template comes with the default shadcn/ui style initialized. If you instead want other ui.shadcn styles, delete `components.json` and [re-install shadcn/ui](https://ui.shadcn.com/docs/installation/next)
+## 📜 Scripts
 
-> Check out [the docs for Local Development](https://supabase.com/docs/guides/getting-started/local-development) to also run Supabase locally.
+- `npm run dev` - Start development server with Turbopack
+- `npm run build` - Build production application
+- `npm run start` - Start production server
+- `npm run lint` - Run ESLint
+- `npm run type-check` - Run TypeScript type checking
+- `npm run test` - Run tests
+- `npm run test:watch` - Run tests in watch mode
+- `npm run test:coverage` - Generate test coverage report
 
-## Feedback and issues
+## 🏗 Architecture
 
-Please file feedback and issues over on the [Supabase GitHub org](https://github.com/supabase/supabase/issues/new/choose).
+### Project Structure
 
-## More Supabase examples
+```
+├── app/                    # Next.js App Router pages
+│   ├── auth/              # Authentication pages
+│   ├── protected/         # Protected routes
+│   ├── layout.tsx         # Root layout
+│   └── page.tsx           # Home page
+├── components/            # React components
+│   ├── ui/               # shadcn/ui components
+│   └── ...               # Feature components
+├── lib/                   # Utility libraries
+│   ├── supabase/         # Supabase configuration
+│   └── utils.ts          # Shared utilities
+├── .github/workflows/    # CI/CD workflows
+└── ...
+```
 
-- [Next.js Subscription Payments Starter](https://github.com/vercel/nextjs-subscription-payments)
-- [Cookie-based Auth and the Next.js 13 App Router (free course)](https://youtube.com/playlist?list=PL5S4mPUpp4OtMhpnp93EFSo42iQ40XjbF)
-- [Supabase Auth and the Next.js App Router](https://github.com/supabase/supabase/tree/master/examples/auth/nextjs)
+### Authentication Flow
+
+- **Client-side**: Browser client for React components
+- **Server-side**: Server client with cookie-based sessions
+- **Middleware**: Session management and refresh
+- **Route Protection**: Server-side authentication checks
+
+## 🧪 Testing
+
+The project includes comprehensive testing setup:
+
+- **Unit Tests**: Component and utility function tests
+- **Integration Tests**: API route and database interaction tests
+- **Coverage Reporting**: Automatic coverage reports with 70% threshold
+- **CI Integration**: Tests run automatically on push/PR
+
+Run tests:
+```bash
+npm test                 # Run all tests
+npm run test:watch       # Run tests in watch mode
+npm run test:coverage    # Generate coverage report
+```
+
+## 🚢 Deployment
+
+### Docker Deployment
+
+1. **Build Docker image**
+   ```bash
+   docker build -t rising-bsm-v2 .
+   ```
+
+2. **Run container**
+   ```bash
+   docker run -p 3000:3000 \
+     -e NEXT_PUBLIC_SUPABASE_URL=your-url \
+     -e NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY=your-key \
+     rising-bsm-v2
+   ```
+
+### CI/CD Pipeline
+
+The project includes automated GitHub Actions workflows:
+
+- **CI Pipeline**: Lint, type-check, test, and build on every push/PR
+- **Deployment Pipeline**: Automated deployment to production on main branch
+- **Container Registry**: Automatic Docker image building and publishing
+
+### Vercel Deployment
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fyour-username%2Frising-bsm-v2)
+
+## 🔧 Configuration
+
+### Environment Variables
+
+Required environment variables:
+
+```env
+# Supabase Configuration
+NEXT_PUBLIC_SUPABASE_URL=your-project-url
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY=your-anon-key
+
+# Optional: Vercel Deployment
+VERCEL_TOKEN=your-vercel-token
+VERCEL_ORG_ID=your-org-id
+VERCEL_PROJECT_ID=your-project-id
+```
+
+### Development Configuration
+
+- **TypeScript**: Strict configuration with path aliases (`@/*`)
+- **ESLint**: Next.js and TypeScript rules
+- **Tailwind**: Extended with shadcn/ui variables
+- **Jest**: Configured for Next.js with jsdom environment
+
+## 📋 Development Guidelines
+
+### Code Style
+
+- Use TypeScript for all new code
+- Follow Next.js 15 and React 19 best practices
+- Use shadcn/ui components for consistent UI
+- Implement proper error handling and loading states
+
+### Authentication Patterns
+
+```typescript
+// Server Components
+import { createClient } from "@/lib/supabase/server";
+
+export default async function ProtectedPage() {
+  const supabase = await createClient();
+  const { data, error } = await supabase.auth.getClaims();
+  
+  if (error || !data?.claims) {
+    redirect("/auth/login");
+  }
+  // ... component logic
+}
+
+// Client Components
+import { createClient } from "@/lib/supabase/client";
+
+export function ClientComponent() {
+  const supabase = createClient();
+  // ... component logic
+}
+```
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Make your changes
+4. Run tests (`npm test`)
+5. Commit your changes (`git commit -m 'Add amazing feature'`)
+6. Push to the branch (`git push origin feature/amazing-feature`)
+7. Open a Pull Request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🆘 Support
+
+- **Documentation**: Check the `/docs` folder for detailed guides
+- **Issues**: Report bugs via [GitHub Issues](https://github.com/your-username/rising-bsm-v2/issues)
+- **Discussions**: Join the community in [GitHub Discussions](https://github.com/your-username/rising-bsm-v2/discussions)
+
+## 🔗 Links
+
+- [Next.js Documentation](https://nextjs.org/docs)
+- [Supabase Documentation](https://supabase.com/docs)
+- [shadcn/ui Components](https://ui.shadcn.com)
+- [Tailwind CSS](https://tailwindcss.com)
+
+---
+
+Built with ❤️ by the Rising BSM Team
