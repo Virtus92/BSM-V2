@@ -6,16 +6,18 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { 
   Mail, 
   Phone, 
   MapPin, 
   Send, 
   CheckCircle,
-  Clock,
   MessageSquare,
   Users,
-  Zap
+  Zap,
+  AlertCircle,
+  Loader2
 } from "lucide-react";
 
 export default function ContactPage() {
@@ -29,20 +31,100 @@ export default function ContactPage() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  const validateField = (name: string, value: string) => {
+    const newErrors = { ...errors };
+    
+    switch (name) {
+      case 'name':
+        if (!value.trim()) {
+          newErrors.name = 'Name ist erforderlich';
+        } else if (value.trim().length < 2) {
+          newErrors.name = 'Name muss mindestens 2 Zeichen haben';
+        } else {
+          delete newErrors.name;
+        }
+        break;
+        
+      case 'email':
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!value.trim()) {
+          newErrors.email = 'E-Mail ist erforderlich';
+        } else if (!emailRegex.test(value)) {
+          newErrors.email = 'Bitte geben Sie eine gültige E-Mail-Adresse ein';
+        } else {
+          delete newErrors.email;
+        }
+        break;
+        
+      case 'subject':
+        if (!value.trim()) {
+          newErrors.subject = 'Betreff ist erforderlich';
+        } else if (value.trim().length < 5) {
+          newErrors.subject = 'Betreff muss mindestens 5 Zeichen haben';
+        } else {
+          delete newErrors.subject;
+        }
+        break;
+        
+      case 'message':
+        if (!value.trim()) {
+          newErrors.message = 'Nachricht ist erforderlich';
+        } else if (value.trim().length < 10) {
+          newErrors.message = 'Nachricht muss mindestens 10 Zeichen haben';
+        } else {
+          delete newErrors.message;
+        }
+        break;
+        
+      case 'phone':
+        if (value.trim() && !/^[\d\s\+\-\(\)]+$/.test(value)) {
+          newErrors.phone = 'Bitte geben Sie eine gültige Telefonnummer ein';
+        } else {
+          delete newErrors.phone;
+        }
+        break;
+    }
+    
+    setErrors(newErrors);
+    return !newErrors[name];
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate all fields
+    const fieldsToValidate = ['name', 'email', 'subject', 'message'];
+    let isValid = true;
+    
+    fieldsToValidate.forEach(field => {
+      const fieldIsValid = validateField(field, formData[field as keyof typeof formData]);
+      if (!fieldIsValid) isValid = false;
+      setTouched(prev => ({ ...prev, [field]: true }));
+    });
+    
+    if (!isValid) return;
+    
     setIsSubmitting(true);
     
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    setIsSubmitting(false);
-    setIsSubmitted(true);
-    
-    // Reset form after 3 seconds
-    setTimeout(() => {
-      setIsSubmitted(false);
+    try {
+      const response = await fetch('/api/contact', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Fehler beim Senden der Nachricht');
+      }
+
+      setIsSubmitted(true);
       setFormData({
         name: '',
         email: '',
@@ -51,14 +133,40 @@ export default function ContactPage() {
         subject: '',
         message: ''
       });
-    }, 3000);
+      setTouched({});
+      setErrors({});
+
+      // Reset success state after 5 seconds
+      setTimeout(() => {
+        setIsSubmitted(false);
+      }, 5000);
+    } catch (error) {
+      console.error('Form submission error:', error);
+      setErrors({
+        submit: error instanceof Error ? error.message : 'Fehler beim Senden der Nachricht. Bitte versuchen Sie es erneut.'
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [name]: value
     });
+    
+    // Real-time validation
+    if (touched[name]) {
+      validateField(name, value);
+    }
+  };
+  
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setTouched(prev => ({ ...prev, [name]: true }));
+    validateField(name, value);
   };
 
   const contactInfo = [
@@ -133,10 +241,19 @@ export default function ContactPage() {
                             name="name"
                             value={formData.name}
                             onChange={handleInputChange}
+                            onBlur={handleBlur}
                             required
-                            className="glass-effect border-white/20 focus:border-primary/50 transition-all duration-300"
+                            className={`glass-effect border-white/20 focus:border-primary/50 transition-all duration-300 ${
+                              errors.name && touched.name ? 'border-red-500 focus:border-red-500' : ''
+                            }`}
                             placeholder="Ihr vollständiger Name"
                           />
+                          {errors.name && touched.name && (
+                            <div className="flex items-center gap-1 text-red-500 text-sm mt-1">
+                              <AlertCircle className="w-4 h-4" />
+                              <span>{errors.name}</span>
+                            </div>
+                          )}
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="email">E-Mail *</Label>
@@ -146,10 +263,19 @@ export default function ContactPage() {
                             type="email"
                             value={formData.email}
                             onChange={handleInputChange}
+                            onBlur={handleBlur}
                             required
-                            className="glass-effect border-white/20 focus:border-primary/50 transition-all duration-300"
+                            className={`glass-effect border-white/20 focus:border-primary/50 transition-all duration-300 ${
+                              errors.email && touched.email ? 'border-red-500 focus:border-red-500' : ''
+                            }`}
                             placeholder="ihre@email.de"
                           />
+                          {errors.email && touched.email && (
+                            <div className="flex items-center gap-1 text-red-500 text-sm mt-1">
+                              <AlertCircle className="w-4 h-4" />
+                              <span>{errors.email}</span>
+                            </div>
+                          )}
                         </div>
                       </div>
                       
@@ -161,6 +287,7 @@ export default function ContactPage() {
                             name="company"
                             value={formData.company}
                             onChange={handleInputChange}
+                            onBlur={handleBlur}
                             className="glass-effect border-white/20 focus:border-primary/50 transition-all duration-300"
                             placeholder="Ihr Unternehmen"
                           />
@@ -173,9 +300,18 @@ export default function ContactPage() {
                             type="tel"
                             value={formData.phone}
                             onChange={handleInputChange}
-                            className="glass-effect border-white/20 focus:border-primary/50 transition-all duration-300"
+                            onBlur={handleBlur}
+                            className={`glass-effect border-white/20 focus:border-primary/50 transition-all duration-300 ${
+                              errors.phone && touched.phone ? 'border-red-500 focus:border-red-500' : ''
+                            }`}
                             placeholder="+49 123 456 789"
                           />
+                          {errors.phone && touched.phone && (
+                            <div className="flex items-center gap-1 text-red-500 text-sm mt-1">
+                              <AlertCircle className="w-4 h-4" />
+                              <span>{errors.phone}</span>
+                            </div>
+                          )}
                         </div>
                       </div>
                       
@@ -186,34 +322,52 @@ export default function ContactPage() {
                           name="subject"
                           value={formData.subject}
                           onChange={handleInputChange}
+                          onBlur={handleBlur}
                           required
-                          className="glass-effect border-white/20 focus:border-primary/50 transition-all duration-300"
+                          className={`glass-effect border-white/20 focus:border-primary/50 transition-all duration-300 ${
+                            errors.subject && touched.subject ? 'border-red-500 focus:border-red-500' : ''
+                          }`}
                           placeholder="Worum geht es in Ihrer Nachricht?"
                         />
+                        {errors.subject && touched.subject && (
+                          <div className="flex items-center gap-1 text-red-500 text-sm mt-1">
+                            <AlertCircle className="w-4 h-4" />
+                            <span>{errors.subject}</span>
+                          </div>
+                        )}
                       </div>
                       
                       <div className="space-y-2">
                         <Label htmlFor="message">Nachricht *</Label>
-                        <textarea
+                        <Textarea
                           id="message"
                           name="message"
                           value={formData.message}
                           onChange={handleInputChange}
+                          onBlur={handleBlur}
                           required
                           rows={5}
-                          className="w-full px-3 py-2 bg-background/50 backdrop-blur-sm border border-white/20 rounded-lg focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all duration-300 resize-none"
+                          className={`glass-effect border-white/20 focus:border-primary/50 transition-all duration-300 resize-none ${
+                            errors.message && touched.message ? 'border-red-500 focus:border-red-500' : ''
+                          }`}
                           placeholder="Beschreiben Sie Ihr Anliegen..."
                         />
+                        {errors.message && touched.message && (
+                          <div className="flex items-center gap-1 text-red-500 text-sm mt-1">
+                            <AlertCircle className="w-4 h-4" />
+                            <span>{errors.message}</span>
+                          </div>
+                        )}
                       </div>
                       
                       <Button 
                         type="submit" 
-                        disabled={isSubmitting}
-                        className="w-full mystery-button group"
+                        disabled={isSubmitting || Object.keys(errors).length > 0}
+                        className="w-full mystery-button group disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {isSubmitting ? (
                           <>
-                            <Clock className="mr-2 w-5 h-5 animate-spin" />
+                            <Loader2 className="mr-2 w-5 h-5 animate-spin" />
                             Wird gesendet...
                           </>
                         ) : (
@@ -223,6 +377,16 @@ export default function ContactPage() {
                           </>
                         )}
                       </Button>
+                      
+                      {/* Form validation summary */}
+                      {Object.keys(errors).length > 0 && (
+                        <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3">
+                          <div className="flex items-center gap-2 text-red-500 text-sm">
+                            <AlertCircle className="w-4 h-4" />
+                            <span>Bitte korrigieren Sie die Fehler oben</span>
+                          </div>
+                        </div>
+                      )}
                     </form>
                   ) : (
                     <div className="text-center py-12 fade-in-up">

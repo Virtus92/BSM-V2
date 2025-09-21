@@ -1,23 +1,44 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { hasEnvVars } from "../utils";
 
 export async function updateSession(request: NextRequest) {
+  // Fast-path: if there's clearly no auth cookie, redirect early
+  const pathname = request.nextUrl.pathname;
+  const isAuthPath = pathname === "/" || pathname.startsWith("/login") || pathname.startsWith("/auth");
+  // Supabase @supabase/ssr stores session in a cookie named with project ref:
+  // e.g. 'sb-<project-ref>' or 'sb-<project-ref>-auth-token'. Support all known variants.
+  const allCookies = request.cookies.getAll();
+  const hasAccessToken = allCookies.some((c) =>
+    c.name === "sb-access-token" ||
+    c.name === "supabase-auth-token" ||
+    c.name.startsWith("sb-")
+  );
+
+  if (!isAuthPath && !hasAccessToken) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/auth/login";
+    return NextResponse.redirect(url);
+  }
+
   let supabaseResponse = NextResponse.next({
     request,
   });
 
-  // If the env vars are not set, skip middleware check. You can remove this
-  // once you setup the project.
-  if (!hasEnvVars) {
-    return supabaseResponse;
-  }
-
   // With Fluid compute, don't put this client in a global environment
   // variable. Always create a new one on each request.
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY;
+
+  if (!url) {
+    throw new Error("Missing env NEXT_PUBLIC_SUPABASE_URL");
+  }
+  if (!anonKey) {
+    throw new Error("Missing env NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY");
+  }
+
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY!,
+    url,
+    anonKey,
     {
       cookies: {
         getAll() {

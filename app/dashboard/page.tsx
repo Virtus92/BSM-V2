@@ -1,274 +1,347 @@
-'use client';
-
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { 
-  Users, 
-  FileText, 
-  BarChart3, 
-  Receipt,
-  Briefcase,
+import { createClient } from '@/lib/supabase/server';
+import { redirect } from 'next/navigation';
+import {
+  Users,
+  MessageSquare,
+  BarChart3,
   TrendingUp,
   Plus,
   ArrowRight,
   Activity,
-  DollarSign,
-  Target
+  Calendar,
+  Clock,
+  Zap
 } from "lucide-react";
 import Link from "next/link";
 
-export default function DashboardPage() {
-  const [mounted, setMounted] = useState(false);
+// ✅ Import unified types instead of local definitions
+import { CustomerStats, ContactRequestStats, ActivityType } from '@/lib/shared-types';
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+// TODO: Import Activity from shared-types once TypeScript parsing issue is resolved
+interface Activity {
+  id: string
+  created_at: string
+  type: ActivityType
+  description: string
+  user_id: string | null
+  user_name?: string
+  entity_type?: 'customer' | 'contact_request' | 'workflow' | 'user' | 'system'
+  entity_id?: string | null
+}
 
-  if (!mounted) {
-    return (
-      <div className="space-y-6">
-        <div className="h-8 bg-muted rounded animate-pulse" />
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-32 bg-muted rounded animate-pulse" />
-          ))}
-        </div>
-      </div>
-    );
+export default async function DashboardPage() {
+  const supabase = await createClient();
+
+  // Check authentication
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    redirect('/auth/login');
   }
 
-  const stats = [
-    {
-      title: "Kunden",
-      value: "156",
-      change: "+12%",
-      icon: Users,
-      color: "text-blue-500",
-      href: "/dashboard/crm"
-    },
-    {
-      title: "Aktive Projekte",
-      value: "23",
-      change: "+5%",
-      icon: BarChart3,
-      color: "text-green-500",
-      href: "/dashboard/projects"
-    },
-    {
-      title: "Offene Angebote",
-      value: "8",
-      change: "+2%",
-      icon: Receipt,
-      color: "text-yellow-500",
-      href: "/dashboard/quotes"
-    },
-    {
-      title: "Verträge",
-      value: "42",
-      change: "+18%",
-      icon: Briefcase,
-      color: "text-purple-500",
-      href: "/dashboard/contracts"
-    }
-  ];
+  // Fetch dashboard statistics - Single-tenant (no workspace filter)
+  const [customersResult, requestsResult] = await Promise.all([
+    // Customer stats
+    supabase
+      .from('customers')
+      .select('id, status, company_name, contact_person, created_at'),
 
-  const recentActivities = [
-    {
-      title: "Neuer Kunde: Mustermann GmbH",
-      description: "Kunde wurde zum CRM hinzugefügt",
-      time: "vor 2 Stunden",
-      icon: Users,
-      color: "text-blue-500"
-    },
-    {
-      title: "Projekt 'Website Relaunch' abgeschlossen",
-      description: "Status auf 'Abgeschlossen' geändert",
-      time: "vor 4 Stunden",
-      icon: BarChart3,
-      color: "text-green-500"
-    },
-    {
-      title: "Angebot #2024-001 versendet",
-      description: "An Max Mustermann gesendet",
-      time: "vor 1 Tag",
-      icon: Receipt,
-      color: "text-yellow-500"
-    },
-    {
-      title: "Vertrag unterzeichnet",
-      description: "Service-Vertrag mit ABC Corp",
-      time: "vor 2 Tagen",
-      icon: Briefcase,
-      color: "text-purple-500"
-    }
-  ];
+    // Contact requests stats
+    supabase
+      .from('contact_requests')
+      .select('id, status, created_at, subject')
+  ]);
 
-  const quickActions = [
-    {
-      title: "Neuer Kunde",
-      description: "Kunde zum CRM hinzufügen",
-      icon: Users,
-      href: "/dashboard/crm?action=new",
-      color: "bg-blue-500/10 hover:bg-blue-500/20 border-blue-500/20"
-    },
-    {
-      title: "Projekt erstellen",
-      description: "Neues Projekt anlegen",
-      icon: BarChart3,
-      href: "/dashboard/projects?action=new",
-      color: "bg-green-500/10 hover:bg-green-500/20 border-green-500/20"
-    },
-    {
-      title: "Angebot schreiben",
-      description: "Neues Angebot erstellen",
-      icon: Receipt,
-      href: "/dashboard/quotes?action=new",
-      color: "bg-yellow-500/10 hover:bg-yellow-500/20 border-yellow-500/20"
-    },
-    {
-      title: "Dokument hochladen",
-      description: "Datei zum Hub hinzufügen",
-      icon: FileText,
-      href: "/dashboard/documents?action=upload",
-      color: "bg-purple-500/10 hover:bg-purple-500/20 border-purple-500/20"
+  type CustomerRow = {
+    id: string
+    status: string | null
+    company_name: string | null
+    contact_person: string | null
+    created_at: string
+  }
+  type RequestRow = {
+    id: string
+    status: string | null
+    created_at: string
+    subject: string | null
+  }
+  const customers = (customersResult.data ?? []) as CustomerRow[];
+  const requests = (requestsResult.data ?? []) as RequestRow[];
+
+  // ✅ Use unified stats calculation matching shared-types.ts
+  const customerStats: CustomerStats = {
+    total: customers.length,
+    lead: customers.filter(c => c.status === 'prospect').length,
+    active: customers.filter(c => c.status === 'active').length,
+    inactive: customers.filter(c => c.status === 'inactive').length,
+    archived: customers.filter(c => c.status === 'archived').length,
+    totalRevenue: 0, // Revenue tracking not yet implemented
+    averageRevenue: 0 // Revenue tracking not yet implemented
+  };
+
+  const requestStats: ContactRequestStats = {
+    total: requests.length,
+    new: requests.filter(r => r.status === 'new').length,
+    inProgress: requests.filter(r => r.status === 'in_progress').length,
+    responded: requests.filter(r => r.status === 'responded').length,
+    converted: requests.filter(r => r.status === 'converted').length,
+    conversionRate: requests.length > 0 ? (requests.filter(r => r.status === 'converted').length / requests.length) * 100 : 0
+  };
+
+  // ✅ Generate real activities from actual database data
+  const recentActivities: Activity[] = [
+    // Recent customers (create activity for each)
+    ...customers.slice(0, 3).map((customer, index) => ({
+      id: `customer_${customer.id}_${index}`,
+      type: 'customer_created' as ActivityType,
+      description: `Kunde "${customer.company_name || customer.contact_person}" wurde angelegt`,
+      created_at: customer.created_at || new Date(Date.now() - 1000 * 60 * (index + 1) * 30).toISOString(),
+      user_id: user.id,
+      user_name: user.email || 'System User',
+      entity_type: 'customer' as const,
+      entity_id: customer.id
+    })),
+    // Recent requests (create activity for each)
+    ...requests.slice(0, 3).map((request, index) => ({
+      id: `request_${request.id}_${index}`,
+      type: 'request_received' as ActivityType,
+      description: `Kontaktanfrage "${request.subject || 'Neue Anfrage'}" eingegangen`,
+      created_at: request.created_at || new Date(Date.now() - 1000 * 60 * (index + 1) * 60).toISOString(),
+      user_id: null,
+      user_name: 'Website',
+      entity_type: 'contact_request' as const,
+      entity_id: request.id
+    }))
+  ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 5);
+
+  const getActivityIcon = (type: ActivityType) => {
+    switch (type) {
+      case 'customer_created': case 'customer_updated': case 'customer_deleted': return Users;
+      case 'request_received': case 'request_updated': case 'request_converted': case 'request_responded': return MessageSquare;
+      case 'workflow_executed': case 'workflow_failed': return Zap;
+      case 'user_login': case 'user_logout': return Users;
+      case 'system_event': return Activity;
+      default: return Activity;
     }
-  ];
+  };
+
+  const getActivityColor = (type: ActivityType) => {
+    switch (type) {
+      case 'customer_created': case 'customer_updated': return 'text-blue-500';
+      case 'customer_deleted': return 'text-red-500';
+      case 'request_received': case 'request_updated': return 'text-yellow-500';
+      case 'request_converted': case 'request_responded': return 'text-green-500';
+      case 'workflow_executed': return 'text-purple-500';
+      case 'workflow_failed': return 'text-red-500';
+      case 'user_login': return 'text-green-500';
+      case 'user_logout': return 'text-gray-500';
+      case 'system_event': return 'text-gray-500';
+      default: return 'text-gray-500';
+    }
+  };
 
   return (
     <div className="space-y-8">
       {/* Header */}
       <div className="fade-in-up">
-        <h1 className="text-3xl font-bold mb-2">
-          Willkommen im <span className="text-mystery-gradient">Dashboard</span>
-        </h1>
-        <p className="text-muted-foreground">
-          Hier ist Ihre Business-Übersicht für heute.
-        </p>
-      </div>
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat, index) => (
-          <Card key={index} className="glass-effect border-0 hover:shadow-mystery transition-all duration-300 group fade-in-up" style={{ animationDelay: `${index * 0.1}s` }}>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {stat.title}
-              </CardTitle>
-              <stat.icon className={`w-4 h-4 ${stat.color}`} />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold mb-1">{stat.value}</div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-green-500 flex items-center gap-1">
-                  <TrendingUp className="w-3 h-3" />
-                  {stat.change}
-                </span>
-                <span className="text-xs text-muted-foreground">vs letzter Monat</span>
-              </div>
-              <Link href={stat.href}>
-                <Button variant="ghost" size="sm" className="w-full mt-3 group-hover:bg-primary/10 transition-all">
-                  Details ansehen
-                  <ArrowRight className="w-3 h-3 ml-1 group-hover:translate-x-1 transition-transform" />
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Quick Actions & Recent Activities */}
-      <div className="grid lg:grid-cols-2 gap-8">
-        {/* Quick Actions */}
-        <Card className="glass-effect border-0 fade-in-up" style={{ animationDelay: '0.5s' }}>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Plus className="w-5 h-5 text-primary" />
-              Schnellaktionen
-            </CardTitle>
-            <CardDescription>
-              Häufig verwendete Aktionen für Ihren Workflow
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {quickActions.map((action, index) => (
-              <Link key={index} href={action.href}>
-                <Button 
-                  variant="ghost" 
-                  className={`w-full justify-start h-auto p-4 ${action.color} transition-all duration-300 group`}
-                >
-                  <action.icon className="mr-3 w-5 h-5 group-hover:scale-110 transition-transform" />
-                  <div className="text-left">
-                    <div className="font-medium">{action.title}</div>
-                    <div className="text-sm text-muted-foreground">{action.description}</div>
-                  </div>
-                </Button>
-              </Link>
-            ))}
-          </CardContent>
-        </Card>
-
-        {/* Recent Activities */}
-        <Card className="glass-effect border-0 fade-in-up" style={{ animationDelay: '0.6s' }}>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Activity className="w-5 h-5 text-primary" />
-              Letzte Aktivitäten
-            </CardTitle>
-            <CardDescription>
-              Ihre neuesten Aktionen im System
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {recentActivities.map((activity, index) => (
-                <div key={index} className="flex items-start gap-4 p-3 rounded-lg hover:bg-primary/5 transition-all duration-200">
-                  <div className="p-2 rounded-lg bg-background border border-white/10">
-                    <activity.icon className={`w-4 h-4 ${activity.color}`} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-sm">{activity.title}</div>
-                    <div className="text-xs text-muted-foreground">{activity.description}</div>
-                    <div className="text-xs text-muted-foreground mt-1">{activity.time}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Performance Overview */}
-      <Card className="glass-effect border-0 fade-in-up" style={{ animationDelay: '0.7s' }}>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Target className="w-5 h-5 text-primary" />
-            Performance Übersicht
-          </CardTitle>
-          <CardDescription>
-            Ihre wichtigsten KPIs auf einen Blick
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="text-center p-6 rounded-lg bg-gradient-to-br from-blue-500/10 to-purple-500/10 border border-blue-500/20">
-              <DollarSign className="w-8 h-8 text-blue-500 mx-auto mb-3" />
-              <div className="text-2xl font-bold text-blue-500 mb-1">€45,200</div>
-              <div className="text-sm text-muted-foreground">Monatsumsatz</div>
-            </div>
-            <div className="text-center p-6 rounded-lg bg-gradient-to-br from-green-500/10 to-blue-500/10 border border-green-500/20">
-              <TrendingUp className="w-8 h-8 text-green-500 mx-auto mb-3" />
-              <div className="text-2xl font-bold text-green-500 mb-1">+23%</div>
-              <div className="text-sm text-muted-foreground">Wachstum</div>
-            </div>
-            <div className="text-center p-6 rounded-lg bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/20">
-              <Target className="w-8 h-8 text-purple-500 mx-auto mb-3" />
-              <div className="text-2xl font-bold text-purple-500 mb-1">92%</div>
-              <div className="text-sm text-muted-foreground">Zielerreichung</div>
+        <div className="flex items-center justify-between bg-slate-900/50 border border-slate-700/50 rounded-2xl p-4 lg:p-8">
+          <div>
+            <h1 className="text-2xl lg:text-4xl font-bold mb-3">
+              <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-blue-400 bg-clip-text text-transparent">
+                Command Center
+              </span>
+            </h1>
+            <p className="text-slate-400 text-sm lg:text-lg">
+              Willkommen zurück! Hier ist eine Übersicht über Ihre Geschäftsaktivitäten.
+            </p>
+          </div>
+          <div className="hidden md:flex items-center gap-4">
+            <div className="text-right">
+              <p className="text-sm text-slate-400">Letztes Update</p>
+              <p className="text-sm font-medium text-white">
+                {new Date().toLocaleDateString('de-DE', {
+                  day: '2-digit',
+                  month: 'short',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}
+              </p>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        {/* Customers Card */}
+        <div className="modern-card fade-in-up stagger-delay-1 group">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center group-hover:bg-blue-500/20 transition-colors">
+                <Users className="w-6 h-6 text-blue-500" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-slate-400">Kunden</p>
+                <p className="text-3xl font-bold text-white">{customerStats.total}</p>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 text-sm">
+            <div className="flex items-center gap-1 text-green-500">
+              <TrendingUp className="w-4 h-4" />
+              <span className="font-medium">{customerStats.active} aktiv</span>
+            </div>
+            <span className="text-slate-400">von {customerStats.total} gesamt</span>
+          </div>
+        </div>
+
+        {/* Contact Requests Card */}
+        <div className="modern-card fade-in-up stagger-delay-2 group">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-yellow-500/10 flex items-center justify-center group-hover:bg-yellow-500/20 transition-colors">
+                <MessageSquare className="w-6 h-6 text-yellow-500" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-slate-400">Anfragen</p>
+                <p className="text-3xl font-bold text-white">{requestStats.total}</p>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 text-sm">
+            <div className="flex items-center gap-1 text-yellow-500">
+              <Clock className="w-4 h-4" />
+              <span className="font-medium">{requestStats.new} neu</span>
+            </div>
+            <span className="text-slate-400">• {requestStats.converted} konvertiert</span>
+          </div>
+        </div>
+
+        {/* N8N Workflows Card */}
+        <div className="modern-card fade-in-up stagger-delay-3 group">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center group-hover:bg-purple-500/20 transition-colors">
+                <Zap className="w-6 h-6 text-purple-500" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-slate-400">Workflows</p>
+                <p className="text-3xl font-bold text-white">N/A</p>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 text-sm">
+            <div className="flex items-center gap-1 text-green-500">
+              <Activity className="w-4 h-4" />
+              <span className="font-medium">N/A</span>
+            </div>
+            <span className="text-slate-400">• N8N Integration pending</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Quick Actions */}
+        <div className="modern-card fade-in-up stagger-delay-4">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-bold text-white">Schnelle Aktionen</h2>
+            <Plus className="w-5 h-5 text-slate-400" />
+          </div>
+
+          <div className="space-y-3">
+            <Link
+              href="/dashboard/crm?action=create"
+              className="flex items-center gap-4 p-4 rounded-xl hover:bg-white/[0.03] transition-all duration-200 border border-transparent hover:border-white/[0.05] group"
+            >
+              <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center group-hover:bg-blue-500/20 transition-colors">
+                <Users className="w-5 h-5 text-blue-500" />
+              </div>
+              <div>
+                <p className="font-medium text-sm text-white">Neuer Kunde</p>
+                <p className="text-xs text-slate-400">Kundendaten erfassen</p>
+              </div>
+              <ArrowRight className="w-4 h-4 text-slate-400 ml-auto group-hover:text-white transition-colors" />
+            </Link>
+
+            <Link
+              href="/dashboard/requests"
+              className="flex items-center gap-4 p-4 rounded-xl hover:bg-white/[0.03] transition-all duration-200 border border-transparent hover:border-white/[0.05] group"
+            >
+              <div className="w-10 h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center group-hover:bg-yellow-500/20 transition-colors">
+                <MessageSquare className="w-5 h-5 text-yellow-500" />
+              </div>
+              <div>
+                <p className="font-medium text-sm text-white">Anfragen bearbeiten</p>
+                <p className="text-xs text-slate-400">Neue Anfragen verwalten</p>
+              </div>
+              <ArrowRight className="w-4 h-4 text-slate-400 ml-auto group-hover:text-white transition-colors" />
+            </Link>
+
+            <Link
+              href="/dashboard/development"
+              className="flex items-center gap-4 p-4 rounded-xl hover:bg-white/[0.03] transition-all duration-200 border border-transparent hover:border-white/[0.05] group"
+            >
+              <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center group-hover:bg-purple-500/20 transition-colors">
+                <BarChart3 className="w-5 h-5 text-purple-500" />
+              </div>
+              <div>
+                <p className="font-medium text-sm text-white">N8N Dashboard</p>
+                <p className="text-xs text-slate-400">Workflows verwalten</p>
+              </div>
+              <ArrowRight className="w-4 h-4 text-slate-400 ml-auto group-hover:text-white transition-colors" />
+            </Link>
+          </div>
+        </div>
+
+        {/* Recent Activity */}
+        <div className="modern-card fade-in-up stagger-delay-5">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-bold text-white">Letzte Aktivitäten</h2>
+            <Calendar className="w-5 h-5 text-slate-400" />
+          </div>
+
+          <div className="space-y-4">
+            {recentActivities.map((activity) => {
+              const Icon = getActivityIcon(activity.type);
+              const colorClass = getActivityColor(activity.type);
+
+              return (
+                <div key={activity.id} className="flex items-start gap-3 p-3 rounded-lg hover:bg-white/[0.02] transition-colors">
+                  <div className={`w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center flex-shrink-0 mt-0.5`}>
+                    <Icon className={`w-4 h-4 ${colorClass}`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-white mb-1">
+                      {activity.description}
+                    </p>
+                    <div className="flex items-center gap-2 text-xs text-slate-400">
+                      <span>{activity.user_name}</span>
+                      <span>•</span>
+                      <span>
+                        {new Date(activity.created_at).toLocaleDateString('de-DE', {
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="mt-6 pt-4 border-t border-slate-700/50">
+            <Link
+              href="/dashboard/activity"
+              className="text-sm text-slate-400 hover:text-white transition-colors flex items-center gap-2"
+            >
+              Alle Aktivitäten anzeigen
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

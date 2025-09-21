@@ -1,122 +1,162 @@
 'use client';
 
-import { useState } from "react";
+import { createContext, useContext, useState, ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { AuthButtonClient } from "@/components/auth-button-client";
 import { cn } from "@/lib/utils";
-import { 
+import {
   LayoutDashboard,
-  Users, 
-  FileText, 
-  BarChart3, 
-  Receipt,
-  Briefcase,
-  Settings,
+  Users,
+  Home,
   ChevronLeft,
   ChevronRight,
-  Home
+  MessageSquare,
+  Bot,
+  Settings
 } from "lucide-react";
 
+const SidebarContext = createContext<{
+  isOpen: boolean;
+  toggleSidebar: () => void;
+}>({
+  isOpen: false,
+  toggleSidebar: () => {}
+});
+
+export const useSidebar = () => useContext(SidebarContext);
+
+export function SidebarProvider({ children }: { children: ReactNode }) {
+  // Default to open on desktop, closed on mobile
+  const [isOpen, setIsOpen] = useState(false);
+
+  const toggleSidebar = () => setIsOpen(!isOpen);
+
+  return (
+    <SidebarContext.Provider value={{ isOpen, toggleSidebar }}>
+      {children}
+    </SidebarContext.Provider>
+  );
+}
+
 const sidebarItems = [
-  { name: "Übersicht", href: "/dashboard", icon: LayoutDashboard },
-  { name: "CRM", href: "/dashboard/crm", icon: Users },
-  { name: "Projekte", href: "/dashboard/projects", icon: BarChart3 },
-  { name: "Dokumente", href: "/dashboard/documents", icon: FileText },
-  { name: "Angebote", href: "/dashboard/quotes", icon: Receipt },
-  { name: "Verträge", href: "/dashboard/contracts", icon: Briefcase },
-  { name: "Einstellungen", href: "/dashboard/settings", icon: Settings },
+  {
+    name: "Übersicht",
+    href: "/dashboard",
+    icon: LayoutDashboard
+  },
+  {
+    name: "CRM",
+    href: "/dashboard/crm",
+    icon: Users
+  },
+  {
+    name: "Anfragen",
+    href: "/dashboard/requests",
+    icon: MessageSquare
+  },
+  {
+    name: "Automation Center",
+    href: "/dashboard/automation",
+    icon: Bot
+  }
 ];
 
 export function DashboardSidebar() {
-  const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
+  const { isOpen, toggleSidebar } = useSidebar();
 
   return (
     <>
-      {/* Desktop Sidebar */}
-      <aside className={cn(
-        "fixed left-0 top-0 h-full glass-effect border-r border-white/10 transition-all duration-300 z-40",
-        collapsed ? "w-16" : "w-64"
-      )}>
-        <div className="p-4">
-          {/* Logo */}
-          <div className="flex items-center justify-between mb-8">
-            {!collapsed && (
-              <Link href="/" className="flex items-center space-x-2 group">
-                <div className="w-8 h-8 bg-mystery-gradient rounded-lg flex items-center justify-center mystery-glow">
-                  <span className="text-white font-bold text-sm">BSM</span>
-                </div>
-                <span className="text-lg font-bold text-mystery-gradient">
-                  Rising BSM V2
-                </span>
-              </Link>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setCollapsed(!collapsed)}
-              className="p-2"
-            >
-              {collapsed ? (
-                <ChevronRight className="h-4 w-4" />
-              ) : (
-                <ChevronLeft className="h-4 w-4" />
-              )}
-            </Button>
-          </div>
+      {/* Mobile Blur Overlay - nur auf Mobile wenn sidebar offen ist */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden"
+          onClick={toggleSidebar}
+        />
+      )}
 
-          {/* Navigation */}
-          <nav className="space-y-2">
-            {sidebarItems.map((item) => {
-              const isActive = pathname === item.href;
-              return (
+      {/* Sidebar */}
+      <aside
+        className={cn(
+          "fixed top-16 left-0 h-[calc(100vh-4rem)] bg-slate-900/95 backdrop-blur-sm border-r border-slate-700/50 z-50 transition-all duration-300 ease-out flex flex-col",
+          // Mobile: Hidden by default, full width when open
+          "transform -translate-x-full lg:translate-x-0",
+          isOpen && "translate-x-0",
+          // Desktop: Fixed width based on state
+          isOpen ? "w-64" : "w-64 lg:w-16"
+        )}
+      >
+
+        {/* Navigation */}
+        <nav className="flex-1 py-4 space-y-1">
+          {sidebarItems.map((item) => {
+            const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
+            return (
+              <div key={item.name} className="px-3">
                 <Link
-                  key={item.name}
                   href={item.href}
                   className={cn(
-                    "flex items-center space-x-3 px-3 py-3 rounded-lg text-sm font-medium transition-all duration-200 group",
+                    "group relative flex items-center h-12 px-3 rounded-lg transition-all duration-200",
                     isActive
-                      ? "bg-primary/10 text-primary shadow-mystery border border-primary/20"
-                      : "text-muted-foreground hover:text-primary hover:bg-primary/5"
+                      ? "bg-gradient-to-r from-blue-500/20 to-purple-600/20 text-white border border-blue-500/30"
+                      : "text-slate-300 hover:bg-slate-700/50 hover:text-white"
                   )}
-                  title={collapsed ? item.name : undefined}
+                  title={!isOpen ? item.name : undefined}
                 >
-                  <item.icon className={cn(
-                    "flex-shrink-0 w-5 h-5 transition-transform duration-200 group-hover:scale-110",
-                    isActive ? "text-primary" : ""
-                  )} />
-                  {!collapsed && <span>{item.name}</span>}
-                </Link>
-              );
-            })}
-          </nav>
+                  <div className="w-5 h-5 flex items-center justify-center">
+                    <item.icon className={cn(
+                      "w-5 h-5 flex-shrink-0 transition-colors duration-200",
+                      isActive ? "text-blue-400" : "text-slate-400 group-hover:text-white"
+                    )} />
+                  </div>
 
-          {/* Bottom Section */}
-          <div className="absolute bottom-4 left-4 right-4">
-            {/* Back to Home */}
-            <Link
-              href="/"
-              className="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all duration-200 mb-4 group"
-              title={collapsed ? "Zur Homepage" : undefined}
-            >
-              <Home className="w-4 h-4 group-hover:scale-110 transition-transform" />
-              {!collapsed && <span>Zur Homepage</span>}
-            </Link>
-            
-            {/* User Info */}
-            {!collapsed && (
-              <div className="glass-effect p-3 rounded-lg border border-white/10">
-                <AuthButtonClient />
+                  {/* Active indicator neben dem Icon */}
+                  {isActive && (
+                    <div className="w-2 h-2 rounded-full bg-blue-400 ml-2" />
+                  )}
+
+                  <span className={cn(
+                    "ml-3 text-sm font-medium transition-all duration-300",
+                    isOpen ? "opacity-100 translate-x-0" : "opacity-0 translate-x-2"
+                  )}>
+                    {item.name}
+                  </span>
+                </Link>
               </div>
-            )}
-          </div>
+            );
+          })}
+        </nav>
+
+        {/* Bottom section */}
+        <div className="border-t border-slate-700/50 p-3">
+          <Link
+            href="/"
+            className="group flex items-center h-12 px-3 rounded-lg text-slate-400 hover:bg-slate-700/50 hover:text-white transition-all duration-200"
+            title={!isOpen ? "Exit to Home" : undefined}
+          >
+            <Home className="w-5 h-5 flex-shrink-0 transition-colors duration-200 group-hover:text-white" />
+            <span className={cn(
+              "ml-3 text-sm font-medium transition-all duration-300",
+              isOpen ? "opacity-100 translate-x-0" : "opacity-0 translate-x-2"
+            )}>
+              Exit to Home
+            </span>
+          </Link>
+        </div>
+
+        {/* Desktop Toggle Button - nur auf Desktop sichtbar */}
+        <div
+          className="absolute left-full top-16 cursor-pointer bg-slate-900/95 w-[30px] h-[40px] hidden lg:flex items-center justify-center"
+          onClick={toggleSidebar}
+          style={{ clipPath: 'polygon(0 0, 100% 50%, 0 100%)' }}
+        >
+          {isOpen ? (
+            <ChevronLeft className="w-4 h-4 text-slate-400 ml-[-6px]" />
+          ) : (
+            <ChevronRight className="w-4 h-4 text-slate-400 ml-[-3px]" />
+          )}
         </div>
       </aside>
-
-      {/* Mobile Overlay */}
-      <div className="lg:hidden fixed inset-0 bg-background/80 backdrop-blur-sm z-30" />
     </>
   );
 }

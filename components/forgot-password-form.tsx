@@ -37,8 +37,9 @@ export function ForgotPasswordForm({
       });
       if (error) throw error;
       setSuccess(true);
-    } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : "An error occurred");
+    } catch (error) {
+      const message = (error as Error).message || 'An error occurred'
+      setError(message)
     } finally {
       setIsLoading(false);
     }

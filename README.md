@@ -242,3 +242,38 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 Built with ❤️ by the Rising BSM Team
+
+## 🧩 docker-compose Stack (App + n8n + Postgres)
+
+This repository includes a `docker-compose.yml` to run the app alongside n8n and its Postgres database.
+
+1) Prepare environment
+
+- Copy `.env.example` to `.env.local` and fill Supabase variables:
+  - `NEXT_PUBLIC_SUPABASE_URL`
+  - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY`
+  - `SUPABASE_SERVICE_ROLE_KEY`
+- Generate docker secrets and n8n credential overwrite:
+
+```
+npm run setup
+```
+
+This writes `.env` (docker) and `n8n/credentials_overwrite.json` (preloading `supabase_connection` credentials in n8n).
+
+2) Start the stack
+
+```
+docker compose up -d --build
+```
+
+App: http://localhost:3000 | n8n: http://localhost:5678
+
+3) Verify health
+
+- Open `http://localhost:3000/status` for a connectivity report.
+
+4) First admin / customer portal
+
+- First authenticated user is auto-promoted to `admin` and lands in `/dashboard`.
+- Later users are `customer` and use `/portal` to create and track requests.

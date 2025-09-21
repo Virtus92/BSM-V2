@@ -1,725 +1,259 @@
+
 'use client';
 
-import React, { useState, useEffect, useMemo } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { 
-  Users, 
-  Search,
-  Filter,
-  Plus,
-  Edit,
-  Trash2,
-  Mail,
-  Phone,
-  Building2,
-  Calendar,
-  Euro,
-  TrendingUp,
-  Activity,
-  Clock,
-  Target,
-  Briefcase
-} from "lucide-react";
-
-// TypeScript types for customer data
-interface CustomerStatus {
-  value: 'lead' | 'kunde' | 'vip' | 'inaktiv';
-  label: string;
-  color: string;
-}
-
-interface CustomerInteraction {
-  id: string;
-  type: 'email' | 'call' | 'meeting' | 'note';
-  description: string;
-  date: string;
-  icon: React.ComponentType<{ className?: string }>;
-}
-
-interface Customer {
-  id: string;
-  name: string;
-  email: string;
-  company: string;
-  phone: string;
-  status: CustomerStatus['value'];
-  lastContact: string;
-  value: number;
-  interactions: CustomerInteraction[];
-  createdAt: string;
-}
-
-// Customer status definitions
-const customerStatuses: Record<CustomerStatus['value'], CustomerStatus> = {
-  lead: { value: 'lead', label: 'Lead', color: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20' },
-  kunde: { value: 'kunde', label: 'Kunde', color: 'bg-green-500/10 text-green-500 border-green-500/20' },
-  vip: { value: 'vip', label: 'VIP', color: 'bg-purple-500/10 text-purple-500 border-purple-500/20' },
-  inaktiv: { value: 'inaktiv', label: 'Inaktiv', color: 'bg-gray-500/10 text-gray-500 border-gray-500/20' }
-};
-
-// Mock German business customer data
-const mockCustomers: Customer[] = [
-    {
-      id: '1',
-      name: 'Max Mustermann',
-      email: 'max.mustermann@musterfirma.de',
-      company: 'Musterfirma GmbH',
-      phone: '+49 30 12345678',
-      status: 'vip',
-      lastContact: '2024-09-10',
-      value: 125000,
-      createdAt: '2024-01-15',
-      interactions: [
-        { id: '1', type: 'email', description: 'Vertragsverlängerung besprochen', date: '2024-09-10', icon: Mail },
-        { id: '2', type: 'meeting', description: 'Quartalsgespräch durchgeführt', date: '2024-08-15', icon: Calendar }
-      ]
-    },
-    {
-      id: '2',
-      name: 'Anna Schmidt',
-      email: 'a.schmidt@techsolution.de',
-      company: 'TechSolution AG',
-      phone: '+49 40 98765432',
-      status: 'kunde',
-      lastContact: '2024-09-08',
-      value: 85000,
-      createdAt: '2024-02-20',
-      interactions: [
-        { id: '3', type: 'call', description: 'Support-Anfrage bearbeitet', date: '2024-09-08', icon: Phone },
-        { id: '4', type: 'email', description: 'Rechnungsstellung geklärt', date: '2024-09-01', icon: Mail }
-      ]
-    },
-    {
-      id: '3',
-      name: 'Klaus Weber',
-      email: 'klaus.weber@innovation-gmbh.de',
-      company: 'Innovation GmbH',
-      phone: '+49 89 55544433',
-      status: 'lead',
-      lastContact: '2024-09-05',
-      value: 0,
-      createdAt: '2024-09-01',
-      interactions: [
-        { id: '5', type: 'email', description: 'Erstberatung terminiert', date: '2024-09-05', icon: Mail }
-      ]
-    },
-    {
-      id: '4',
-      name: 'Sarah Müller',
-      email: 's.mueller@digital-services.de',
-      company: 'Digital Services GmbH',
-      phone: '+49 221 77788899',
-      status: 'kunde',
-      lastContact: '2024-08-28',
-      value: 67500,
-      createdAt: '2024-03-10',
-      interactions: [
-        { id: '6', type: 'meeting', description: 'Projektabschluss besprochen', date: '2024-08-28', icon: Calendar }
-      ]
-    },
-    {
-      id: '5',
-      name: 'Thomas Becker',
-      email: 't.becker@consulting-pro.de',
-      company: 'Consulting Pro',
-      phone: '+49 69 11122233',
-      status: 'inaktiv',
-      lastContact: '2024-06-15',
-      value: 45000,
-      createdAt: '2023-11-05',
-      interactions: [
-        { id: '7', type: 'note', description: 'Projekt pausiert auf Kundenwunsch', date: '2024-06-15', icon: Activity }
-      ]
-    },
-    {
-      id: '6',
-      name: 'Lisa König',
-      email: 'l.koenig@startup-hub.de',
-      company: 'Startup Hub Berlin',
-      phone: '+49 30 99887766',
-      status: 'lead',
-      lastContact: '2024-09-12',
-      value: 0,
-      createdAt: '2024-09-10',
-      interactions: [
-        { id: '8', type: 'call', description: 'Erstberatung durchgeführt', date: '2024-09-12', icon: Phone }
-      ]
-    }
-  ];
+import { useToast } from "@/components/ui/use-toast";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Plus, Loader2, AlertCircle, ChevronDown, Trash2 } from "lucide-react";
+import { useCustomers } from "@/lib/hooks/useCustomers";
+import { CustomerStats } from "@/components/crm/CustomerStats";
+import { CustomerFilters } from "@/components/crm/CustomerFilters";
+import { CustomerList } from "@/components/crm/CustomerList";
+import { CustomerQuickModal } from "@/components/crm/CustomerQuickModal";
+import { CustomerForm } from "@/components/crm/CustomerForm";
+import type { Customer } from "@/lib/shared-types";
+// Services only used via API routes
+import { useRouter, useSearchParams } from "next/navigation";
 
 export default function CRMPage() {
-  const [mounted, setMounted] = useState(false);
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [isNewCustomerDialogOpen, setIsNewCustomerDialogOpen] = useState(false);
-  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
-  const [newCustomer, setNewCustomer] = useState({
-    name: '',
-    email: '',
-    company: '',
-    phone: '',
-    status: 'lead' as CustomerStatus['value']
-  });
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { toast } = useToast();
+  const {
+    customers,
+    filteredCustomers,
+    loading,
+    error,
+    searchTerm,
+    statusFilter,
+    stats,
+    setSearchTerm,
+    setStatusFilter,
+    refetch
+  } = useCustomers();
 
+  const [quickModalCustomer, setQuickModalCustomer] = useState<Customer | null>(null);
+  const [editCustomer, setEditCustomer] = useState<Customer | null>(null);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [deleteCustomer, setDeleteCustomer] = useState<Customer | null>(null);
+
+  // Open create form via dashboard quick action (?action=create)
   useEffect(() => {
-    setMounted(true);
-    setCustomers(mockCustomers);
-  }, []); // mockCustomers is static data, safe to ignore dependency warning
+    const action = searchParams.get('action');
+    if (action === 'create') {
+      setShowCreateForm(true);
+      // Clean the URL to avoid reopening on back/refresh
+      router.replace('/dashboard/crm');
+    }
+  }, [searchParams, router]);
 
-  // Filter customers based on search and status
-  const filteredCustomers = useMemo(() => {
-    return customers.filter(customer => {
-      const matchesSearch = 
-        customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        customer.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        customer.email.toLowerCase().includes(searchTerm.toLowerCase());
-      
-      const matchesStatus = statusFilter === 'all' || customer.status === statusFilter;
-      
-      return matchesSearch && matchesStatus;
-    });
-  }, [customers, searchTerm, statusFilter]);
+  // Open edit form via deep link (?edit=<id>)
+  useEffect(() => {
+    const editId = searchParams.get('edit');
+    if (!editId) return;
+    if (!customers || customers.length === 0) return;
 
-  // Calculate statistics
-  const stats = useMemo(() => {
-    const totalCustomers = customers.length;
-    const newThisMonth = customers.filter(c => 
-      new Date(c.createdAt) >= new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-    ).length;
-    const totalValue = customers.reduce((sum, c) => sum + c.value, 0);
-    const activeCustomers = customers.filter(c => c.status !== 'inaktiv').length;
-    
-    return {
-      totalCustomers,
-      newThisMonth,
-      totalValue,
-      activeCustomers
-    };
-  }, [customers]);
+    const customerToEdit = customers.find((c) => c.id === editId);
+    if (customerToEdit) {
+      setEditCustomer(customerToEdit);
+      setShowCreateForm(false);
+      router.replace('/dashboard/crm');
+    }
+  }, [searchParams, customers, router]);
 
-  const handleAddCustomer = () => {
-    if (!newCustomer.name || !newCustomer.email) return;
-    
-    const customer: Customer = {
-      id: Date.now().toString(),
-      ...newCustomer,
-      lastContact: new Date().toISOString().split('T')[0],
-      value: 0,
-      createdAt: new Date().toISOString().split('T')[0],
-      interactions: [{
-        id: Date.now().toString(),
-        type: 'note',
-        description: 'Kunde wurde zum CRM hinzugefügt',
-        date: new Date().toISOString().split('T')[0],
-        icon: Activity
-      }]
-    };
-    
-    setCustomers([...customers, customer]);
-    setNewCustomer({ name: '', email: '', company: '', phone: '', status: 'lead' });
-    setIsNewCustomerDialogOpen(false);
+  const handleDeleteCustomer = (customer: Customer) => {
+    setDeleteCustomer(customer);
   };
 
-  const handleEditCustomer = (customer: Customer) => {
-    setEditingCustomer(customer);
-    setNewCustomer({
-      name: customer.name,
-      email: customer.email,
-      company: customer.company,
-      phone: customer.phone,
-      status: customer.status
-    });
+  const confirmDeleteCustomer = async () => {
+    if (!deleteCustomer) return;
+
+    const customerName = deleteCustomer.company_name || deleteCustomer.contact_person || 'Unbekannter Kunde';
+
+    try {
+      const response = await fetch(`/api/customers/${deleteCustomer.id}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        await refetch();
+        toast({
+          title: "Erfolgreich gelöscht",
+          description: `Kunde "${customerName}" wurde erfolgreich gelöscht.`,
+        });
+      } else {
+        const errorData = await response.json();
+        console.error('Failed to delete customer:', errorData);
+        toast({
+          title: "Fehler beim Löschen",
+          description: errorData.error || "Kunde konnte nicht gelöscht werden.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Failed to delete customer:', error);
+      toast({
+        title: "Unerwarteter Fehler",
+        description: "Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut.",
+        variant: "destructive",
+      });
+    } finally {
+      setDeleteCustomer(null);
+    }
   };
 
-  const handleUpdateCustomer = () => {
-    if (!editingCustomer || !newCustomer.name || !newCustomer.email) return;
-    
-    setCustomers(customers.map(c => 
-      c.id === editingCustomer.id 
-        ? { ...c, ...newCustomer }
-        : c
-    ));
-    setEditingCustomer(null);
-    setNewCustomer({ name: '', email: '', company: '', phone: '', status: 'lead' });
+  const handleFormSuccess = async () => {
+    await refetch();
+    setEditCustomer(null);
+    setShowCreateForm(false);
   };
 
-  const handleDeleteCustomer = (customerId: string) => {
-    setCustomers(customers.filter(c => c.id !== customerId));
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('de-DE', {
-      style: 'currency',
-      currency: 'EUR'
-    }).format(amount);
-  };
-
-  if (!mounted) {
+  if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="h-8 bg-muted rounded animate-pulse" />
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-32 bg-muted rounded animate-pulse" />
-          ))}
-        </div>
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="w-8 h-8 animate-spin" />
+        <span className="ml-2">Lade Kunden...</span>
       </div>
     );
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4 md:space-y-8 max-w-7xl mx-auto">
       {/* Header */}
       <div className="fade-in-up">
-        <h1 className="text-3xl font-bold mb-2">
-          <span className="text-mystery-gradient">CRM Dashboard</span>
-        </h1>
-        <p className="text-muted-foreground">
-          Verwalten Sie Ihre Kundenbeziehungen und -interaktionen.
-        </p>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-4xl font-bold mb-3">
+              <span className="text-mystery-gradient">CRM</span>
+            </h1>
+            <p className="text-muted-foreground text-lg">
+              Verwalten Sie Ihre Kundenbeziehungen und Verkaufschancen.
+            </p>
+          </div>
+          <Button onClick={() => setShowCreateForm(true)} className="mystery-button">
+            <Plus className="w-4 h-4 mr-2" />
+            Neuer Kunde
+          </Button>
+        </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="glass-effect border-0 hover:shadow-mystery transition-all duration-300 group fade-in-up" style={{ animationDelay: '0.1s' }}>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Gesamt Kunden
-            </CardTitle>
-            <Users className="w-4 h-4 text-blue-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold mb-1">{stats.totalCustomers}</div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-green-500 flex items-center gap-1">
-                <TrendingUp className="w-3 h-3" />
-                +{stats.newThisMonth} neu
-              </span>
-              <span className="text-xs text-muted-foreground">diesen Monat</span>
+      {/* Error Display */}
+      {error && (
+        <div className="modern-card border-red-500/20 bg-red-500/5 fade-in-up">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center">
+              <AlertCircle className="w-5 h-5 text-red-500" />
             </div>
-          </CardContent>
-        </Card>
-
-        <Card className="glass-effect border-0 hover:shadow-mystery transition-all duration-300 group fade-in-up" style={{ animationDelay: '0.2s' }}>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Aktive Kunden
-            </CardTitle>
-            <Target className="w-4 h-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold mb-1">{stats.activeCustomers}</div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-blue-500">
-                {Math.round((stats.activeCustomers / stats.totalCustomers) * 100)}%
-              </span>
-              <span className="text-xs text-muted-foreground">der Gesamtkunden</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="glass-effect border-0 hover:shadow-mystery transition-all duration-300 group fade-in-up" style={{ animationDelay: '0.3s' }}>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Gesamtwert
-            </CardTitle>
-            <Euro className="w-4 h-4 text-purple-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold mb-1">{formatCurrency(stats.totalValue)}</div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-green-500 flex items-center gap-1">
-                <TrendingUp className="w-3 h-3" />
-                +15%
-              </span>
-              <span className="text-xs text-muted-foreground">vs letzter Monat</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="glass-effect border-0 hover:shadow-mystery transition-all duration-300 group fade-in-up" style={{ animationDelay: '0.4s' }}>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Durchschnittswert
-            </CardTitle>
-            <Briefcase className="w-4 h-4 text-yellow-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold mb-1">
-              {formatCurrency(stats.totalValue / stats.totalCustomers || 0)}
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-blue-500">pro Kunde</span>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Search and Filters */}
-      <Card className="glass-effect border-0 fade-in-up" style={{ animationDelay: '0.5s' }}>
-        <CardContent className="p-6">
-          <div className="flex flex-col lg:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-              <Input
-                placeholder="Kunden durchsuchen..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 glass-effect border-0"
-              />
-            </div>
-            <div className="flex gap-2">
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[180px] glass-effect border-0">
-                  <Filter className="w-4 h-4 mr-2" />
-                  <SelectValue placeholder="Status filtern" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Alle Status</SelectItem>
-                  <SelectItem value="lead">Lead</SelectItem>
-                  <SelectItem value="kunde">Kunde</SelectItem>
-                  <SelectItem value="vip">VIP</SelectItem>
-                  <SelectItem value="inaktiv">Inaktiv</SelectItem>
-                </SelectContent>
-              </Select>
-              
-              <Dialog open={isNewCustomerDialogOpen} onOpenChange={setIsNewCustomerDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button className="mystery-button">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Neuer Kunde
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[425px]">
-                  <DialogHeader>
-                    <DialogTitle>Neuen Kunden hinzufügen</DialogTitle>
-                    <DialogDescription>
-                      Fügen Sie einen neuen Kunden zu Ihrem CRM hinzu.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="grid gap-4 py-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="name">Name *</Label>
-                      <Input
-                        id="name"
-                        value={newCustomer.name}
-                        onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })}
-                        placeholder="Max Mustermann"
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="email">E-Mail *</Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        value={newCustomer.email}
-                        onChange={(e) => setNewCustomer({ ...newCustomer, email: e.target.value })}
-                        placeholder="max@example.com"
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="company">Unternehmen</Label>
-                      <Input
-                        id="company"
-                        value={newCustomer.company}
-                        onChange={(e) => setNewCustomer({ ...newCustomer, company: e.target.value })}
-                        placeholder="Musterfirma GmbH"
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="phone">Telefon</Label>
-                      <Input
-                        id="phone"
-                        value={newCustomer.phone}
-                        onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })}
-                        placeholder="+49 30 12345678"
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="status">Status</Label>
-                      <Select value={newCustomer.status} onValueChange={(value: CustomerStatus['value']) => setNewCustomer({ ...newCustomer, status: value })}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Object.values(customerStatuses).map(status => (
-                            <SelectItem key={status.value} value={status.value}>
-                              {status.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button variant="outline" onClick={() => setIsNewCustomerDialogOpen(false)}>
-                      Abbrechen
-                    </Button>
-                    <Button onClick={handleAddCustomer} className="mystery-button">
-                      Kunde hinzufügen
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
+            <div>
+              <p className="font-medium text-red-500">Fehler aufgetreten</p>
+              <p className="text-sm text-red-500/80">{error}</p>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      )}
+
+      {/* Statistics Cards - desktop above filters */}
+      <div className="hidden md:block">
+        <CustomerStats stats={stats} />
+      </div>
+
+      {/* Statistics Cards - mobile collapsible above filters */}
+      <div className="md:hidden">
+        <details className="modern-card no-marker">
+          <summary className="flex items-center justify-between cursor-pointer select-none bg-transparent">
+            <span className="font-semibold">Statistiken</span>
+            <ChevronDown className="w-4 h-4 text-muted-foreground" />
+          </summary>
+          <div className="mt-4">
+            <CustomerStats stats={stats} />
+          </div>
+        </details>
+      </div>
+
+      {/* Search and Filter Controls */}
+      <CustomerFilters
+        searchTerm={searchTerm}
+        statusFilter={statusFilter}
+        totalCustomers={customers.length}
+        filteredCount={filteredCustomers.length}
+        onSearchChange={setSearchTerm}
+        onStatusChange={setStatusFilter}
+      />
 
       {/* Customer List */}
-      <Card className="glass-effect border-0 fade-in-up" style={{ animationDelay: '0.6s' }}>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="w-5 h-5 text-primary" />
-            Kundenliste ({filteredCustomers.length})
-          </CardTitle>
-          <CardDescription>
-            Übersicht aller Kunden mit wichtigen Informationen
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-md border border-white/10">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Kunde</TableHead>
-                  <TableHead>Unternehmen</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Letzter Kontakt</TableHead>
-                  <TableHead>Wert</TableHead>
-                  <TableHead className="text-right">Aktionen</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredCustomers.map((customer, index) => (
-                  <TableRow key={customer.id} className="hover:bg-primary/5 transition-colors" style={{ animationDelay: `${0.7 + index * 0.05}s` }}>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-mystery-gradient flex items-center justify-center text-white font-semibold text-sm mystery-glow">
-                          {customer.name.charAt(0)}
-                        </div>
-                        <div>
-                          <div className="font-medium">{customer.name}</div>
-                          <div className="text-sm text-muted-foreground">{customer.email}</div>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Building2 className="w-4 h-4 text-muted-foreground" />
-                        {customer.company || '-'}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={customerStatuses[customer.status].color}>
-                        {customerStatuses[customer.status].label}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Clock className="w-4 h-4 text-muted-foreground" />
-                        {new Date(customer.lastContact).toLocaleDateString('de-DE')}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="font-medium">
-                        {customer.value > 0 ? formatCurrency(customer.value) : '-'}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEditCustomer(customer)}
-                          className="hover:bg-primary/10"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          asChild
-                          className="hover:bg-blue-500/10"
-                        >
-                          <a href={`mailto:${customer.email}`}>
-                            <Mail className="w-4 h-4" />
-                          </a>
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          asChild
-                          className="hover:bg-green-500/10"
-                        >
-                          <a href={`tel:${customer.phone}`}>
-                            <Phone className="w-4 h-4" />
-                          </a>
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteCustomer(customer.id)}
-                          className="hover:bg-destructive/10 text-destructive"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+      <CustomerList
+        customers={filteredCustomers}
+        onCustomerClick={setQuickModalCustomer}
+        onEditCustomer={setEditCustomer}
+        onDeleteCustomer={handleDeleteCustomer}
+        onCreate={() => setShowCreateForm(true)}
+      />
 
-      {/* Customer Interaction Timeline */}
-      <Card className="glass-effect border-0 fade-in-up" style={{ animationDelay: '0.8s' }}>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Activity className="w-5 h-5 text-primary" />
-            Letzte Kundeninteraktionen
-          </CardTitle>
-          <CardDescription>
-            Übersicht der neuesten Kundenaktivitäten
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {customers
-              .flatMap(customer => 
-                customer.interactions.map(interaction => ({
-                  ...interaction,
-                  customerName: customer.name,
-                  customerCompany: customer.company,
-                  status: customer.status
-                }))
-              )
-              .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-              .slice(0, 6)
-              .map((interaction, index) => (
-                <div key={interaction.id} className="flex items-start gap-4 p-4 rounded-lg hover:bg-primary/5 transition-all duration-200 group fade-in-up" style={{ animationDelay: `${0.9 + index * 0.05}s` }}>
-                  <div className="p-2 rounded-lg bg-background border border-white/10 mystery-glow">
-                    <interaction.icon className="w-4 h-4 text-primary" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <div className="font-medium text-sm">{interaction.customerName}</div>
-                      <Badge className={customerStatuses[interaction.status as CustomerStatus['value']].color} variant="outline">
-                        {customerStatuses[interaction.status as CustomerStatus['value']].label}
-                      </Badge>
-                    </div>
-                    <div className="text-sm text-muted-foreground mb-1">{interaction.customerCompany}</div>
-                    <div className="text-sm">{interaction.description}</div>
-                    <div className="text-xs text-muted-foreground mt-2">
-                      {new Date(interaction.date).toLocaleDateString('de-DE')}
-                    </div>
-                  </div>
-                </div>
-              ))}
-          </div>
-        </CardContent>
-      </Card>
+      {/* Customer Quick Modal */}
+      <CustomerQuickModal
+        customer={quickModalCustomer}
+        open={!!quickModalCustomer}
+        onOpenChange={(open) => !open && setQuickModalCustomer(null)}
+        onEdit={(customer) => {
+          setQuickModalCustomer(null);
+          setEditCustomer(customer);
+        }}
+      />
 
-      {/* Edit Customer Dialog */}
-      <Dialog open={editingCustomer !== null} onOpenChange={() => setEditingCustomer(null)}>
-        <DialogContent className="sm:max-w-[425px]">
+      {/* Customer Create Form */}
+      <CustomerForm
+        open={showCreateForm}
+        onOpenChange={setShowCreateForm}
+        onSuccess={handleFormSuccess}
+      />
+
+      {/* Customer Edit Form */}
+      <CustomerForm
+        open={!!editCustomer}
+        onOpenChange={(open) => !open && setEditCustomer(null)}
+        customer={editCustomer}
+        onSuccess={handleFormSuccess}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!deleteCustomer} onOpenChange={(open) => !open && setDeleteCustomer(null)}>
+        <DialogContent className="max-w-md modern-card border-0">
           <DialogHeader>
-            <DialogTitle>Kunde bearbeiten</DialogTitle>
-            <DialogDescription>
-              Bearbeiten Sie die Informationen des Kunden.
-            </DialogDescription>
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-red-500/10 flex items-center justify-center">
+                <Trash2 className="w-6 h-6 text-red-500" />
+              </div>
+              <div>
+                <DialogTitle className="text-xl text-foreground">Kunde löschen</DialogTitle>
+                <DialogDescription className="text-muted-foreground">
+                  Diese Aktion kann nicht rückgängig gemacht werden.
+                </DialogDescription>
+              </div>
+            </div>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="edit-name">Name *</Label>
-              <Input
-                id="edit-name"
-                value={newCustomer.name}
-                onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })}
-                placeholder="Max Mustermann"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="edit-email">E-Mail *</Label>
-              <Input
-                id="edit-email"
-                type="email"
-                value={newCustomer.email}
-                onChange={(e) => setNewCustomer({ ...newCustomer, email: e.target.value })}
-                placeholder="max@example.com"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="edit-company">Unternehmen</Label>
-              <Input
-                id="edit-company"
-                value={newCustomer.company}
-                onChange={(e) => setNewCustomer({ ...newCustomer, company: e.target.value })}
-                placeholder="Musterfirma GmbH"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="edit-phone">Telefon</Label>
-              <Input
-                id="edit-phone"
-                value={newCustomer.phone}
-                onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })}
-                placeholder="+49 30 12345678"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="edit-status">Status</Label>
-              <Select value={newCustomer.status} onValueChange={(value: CustomerStatus['value']) => setNewCustomer({ ...newCustomer, status: value })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.values(customerStatuses).map(status => (
-                    <SelectItem key={status.value} value={status.value}>
-                      {status.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="py-4">
+            <p className="text-foreground">
+              Möchten Sie den Kunden <span className="font-semibold">
+                &quot;{deleteCustomer?.company_name || deleteCustomer?.contact_person || 'Unbekannter Kunde'}&quot;
+              </span> wirklich löschen?
+            </p>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditingCustomer(null)}>
+          <DialogFooter className="flex gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setDeleteCustomer(null)}
+              className="flex-1"
+            >
               Abbrechen
             </Button>
-            <Button onClick={handleUpdateCustomer} className="mystery-button">
-              Änderungen speichern
+            <Button
+              variant="destructive"
+              onClick={confirmDeleteCustomer}
+              className="flex-1"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Löschen
             </Button>
           </DialogFooter>
         </DialogContent>

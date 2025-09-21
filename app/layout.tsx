@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import { ThemeProvider } from "next-themes";
+import { Toaster } from "sonner";
 import "./globals.css";
 
 const defaultUrl = process.env.VERCEL_URL
@@ -11,6 +12,13 @@ export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
   title: "Rising BSM V2",
   description: "Business Service Management Platform - Next Generation",
+};
+
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 const geistSans = Geist({
@@ -34,6 +42,11 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           {children}
+          <Toaster
+            theme="dark"
+            position="top-right"
+            richColors
+          />
         </ThemeProvider>
       </body>
     </html>

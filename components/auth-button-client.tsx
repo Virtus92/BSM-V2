@@ -13,21 +13,19 @@ export function AuthButtonClient() {
   const supabase = createClient();
 
   useEffect(() => {
-    const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
+    let unsub: (() => void) | undefined;
+    (async () => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      setUser(sessionData.session?.user ?? null);
       setLoading(false);
-    };
-
-    getUser();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
-  }, [supabase.auth]);
+      const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+        setUser(session?.user ?? null);
+        setLoading(false);
+      });
+      unsub = () => data.subscription.unsubscribe();
+    })();
+    return () => { if (unsub) unsub(); };
+  }, [supabase]);
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
