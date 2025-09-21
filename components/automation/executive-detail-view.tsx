@@ -12,9 +12,11 @@ import type { LiveMonitoring } from '@/lib/services/execution-controller'
 import { classifyView, getAvailableViews, getViewTheme } from '@/lib/services/executive-view-model'
 import { EmployeeControls } from '@/components/automation/employee-controls'
 import { ProcessControls } from '@/components/automation/process-controls'
-import { LiveMonitoringComponent } from '@/components/automation/live-monitoring'
+import { EmployeePerformance } from '@/components/automation/employee-performance'
+import { ProcessPerformance } from '@/components/automation/process-performance'
 import { WorkflowVisualizer } from '@/components/automation/workflow-visualizer'
 import { Button } from '@/components/ui/button'
+import { AIAgentChatModal } from '@/components/automation/AIAgentChatModal'
 
 interface ExecutiveDetailViewProps {
   insight: WorkflowInsight
@@ -29,6 +31,16 @@ export function ExecutiveDetailView({ insight, triggers, monitoring, workflowId,
   const available = getAvailableViews(insight, triggers)
   const [view, setView] = useState(initial)
   const theme = useMemo(() => getViewTheme(view), [view])
+  const [isChatModalOpen, setIsChatModalOpen] = useState(false)
+  const [chatInitialMessage, setChatInitialMessage] = useState<string>('')
+
+  const handleChatStart = (message?: string) => {
+    if (message && message.trim()) {
+      setChatInitialMessage(message.trim())
+    }
+    setIsChatModalOpen(true)
+  }
+
 
   return (
     <div className="space-y-8">
@@ -91,7 +103,11 @@ export function ExecutiveDetailView({ insight, triggers, monitoring, workflowId,
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Employee Interaction */}
             <div className="lg:col-span-2">
-              <EmployeeControls insight={insight} triggers={triggers} />
+              <EmployeeControls
+                insight={insight}
+                triggers={triggers}
+                onChatStart={handleChatStart}
+              />
             </div>
 
             {/* Employee Status */}
@@ -114,23 +130,27 @@ export function ExecutiveDetailView({ insight, triggers, monitoring, workflowId,
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span>Aufgaben heute:</span>
-                    <span className="font-medium">{insight.executionHistory.total}</span>
+                    <span className="font-medium">{monitoring.metrics.executionsToday}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Erfolgsrate:</span>
                     <span className={`font-medium ${
-                      insight.executionHistory.total > 0 &&
-                      Math.round((insight.executionHistory.successful / insight.executionHistory.total) * 100) >= 95
-                        ? 'text-green-500' : 'text-yellow-500'
+                      monitoring.metrics.successRate >= 95 ? 'text-green-500' :
+                      monitoring.metrics.successRate >= 80 ? 'text-yellow-500' : 'text-red-500'
                     }`}>
-                      {insight.executionHistory.total > 0 ?
-                        Math.round((insight.executionHistory.successful / insight.executionHistory.total) * 100) + '%'
-                        : 'N/A'}
+                      {monitoring.metrics.successRate}%
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span>Antwortzeit:</span>
-                    <span className="font-medium">~2-5 Min</span>
+                    <span className="font-medium">
+                      {monitoring.metrics.averageResponseTime < 1000
+                        ? `${monitoring.metrics.averageResponseTime}ms`
+                        : monitoring.metrics.averageResponseTime < 60000
+                        ? `${Math.round(monitoring.metrics.averageResponseTime / 1000)}s`
+                        : `${Math.round(monitoring.metrics.averageResponseTime / 60000)}min`
+                      }
+                    </span>
                   </div>
                 </div>
               </CardContent>
@@ -138,20 +158,12 @@ export function ExecutiveDetailView({ insight, triggers, monitoring, workflowId,
           </div>
 
           {/* Employee Activity Monitoring */}
-          <Card className="modern-card">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Activity className="w-5 h-5 text-purple-500" />
-                Arbeitsaktivität & Leistung
-              </CardTitle>
-              <CardDescription>
-                Überwachung der Arbeitszeit und Aufgabenbearbeitung
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <LiveMonitoringComponent workflowId={workflowId} initialData={monitoring} refreshInterval={5000} />
-            </CardContent>
-          </Card>
+          <EmployeePerformance
+            workflowId={workflowId}
+            initialData={monitoring}
+            insight={insight}
+            refreshInterval={5000}
+          />
 
           {/* Employee Communication Channels */}
           <Card className="modern-card border-purple-500/20">
@@ -237,15 +249,24 @@ export function ExecutiveDetailView({ insight, triggers, monitoring, workflowId,
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span>Uptime:</span>
-                      <span className="font-medium text-green-500">99.8%</span>
+                      <span className={`font-medium ${monitoring.metrics.successRate >= 95 ? 'text-green-500' : 'text-yellow-500'}`}>
+                        {monitoring.metrics.successRate}%
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span>Load:</span>
-                      <span className="font-medium">{monitoring.isRunning ? 'High' : 'Normal'}</span>
+                      <span className="font-medium">{monitoring.isRunning ? 'Running' : 'Idle'}</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Response:</span>
-                      <span className="font-medium">~200ms</span>
+                      <span className="font-medium">
+                        {monitoring.metrics.averageResponseTime < 1000
+                          ? `${monitoring.metrics.averageResponseTime}ms`
+                          : monitoring.metrics.averageResponseTime < 60000
+                          ? `${Math.round(monitoring.metrics.averageResponseTime / 1000)}s`
+                          : `${Math.round(monitoring.metrics.averageResponseTime / 60000)}min`
+                        }
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -254,20 +275,12 @@ export function ExecutiveDetailView({ insight, triggers, monitoring, workflowId,
           </div>
 
           {/* System Performance & Monitoring */}
-          <Card className="modern-card">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-orange-500" />
-                System Performance & Ausführungen
-              </CardTitle>
-              <CardDescription>
-                Technische Metriken und Ausführungsstatistiken
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <LiveMonitoringComponent workflowId={workflowId} initialData={monitoring} refreshInterval={5000} />
-            </CardContent>
-          </Card>
+          <ProcessPerformance
+            workflowId={workflowId}
+            initialData={monitoring}
+            insight={insight}
+            refreshInterval={5000}
+          />
 
           {/* Technical Configuration */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -366,7 +379,17 @@ export function ExecutiveDetailView({ insight, triggers, monitoring, workflowId,
           </div>
         </div>
       )}
+
+      {/* AI Agent Chat Modal */}
+      <AIAgentChatModal
+        workflow={insight}
+        open={isChatModalOpen}
+        onOpenChange={(open) => {
+          setIsChatModalOpen(open)
+          if (!open) setChatInitialMessage('')
+        }}
+        initialMessage={chatInitialMessage}
+      />
     </div>
   )
 }
-

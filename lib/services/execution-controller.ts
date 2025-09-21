@@ -419,21 +419,50 @@ export class ExecutionController {
   }
 
   /**
-   * Get detailed execution logs
+   * Get detailed execution logs with result data
    */
   static async getExecutionLogs(executionId: string) {
     try {
-      const response = await fetch(`${process.env.N8N_BASE_URL}/api/v1/executions/${executionId}`, {
+      // Try to get execution with result data using includeData parameter
+      let response = await fetch(`${process.env.N8N_BASE_URL}/api/v1/executions/${executionId}?includeData=true`, {
         headers: {
           'X-N8N-API-KEY': process.env.N8N_API_KEY!
         }
       })
+
+      // If that doesn't work, try without the parameter
+      if (!response.ok) {
+        response = await fetch(`${process.env.N8N_BASE_URL}/api/v1/executions/${executionId}`, {
+          headers: {
+            'X-N8N-API-KEY': process.env.N8N_API_KEY!
+          }
+        })
+      }
 
       if (!response.ok) {
         throw new Error(`Failed to get execution logs: ${response.statusText}`)
       }
 
       const execution = await response.json()
+
+      // If no result data, try to get it from a separate endpoint
+      if (!execution.data || !execution.data.resultData) {
+        try {
+          const dataResponse = await fetch(`${process.env.N8N_BASE_URL}/api/v1/executions/${executionId}/results`, {
+            headers: {
+              'X-N8N-API-KEY': process.env.N8N_API_KEY!
+            }
+          })
+
+          if (dataResponse.ok) {
+            const resultData = await dataResponse.json()
+            execution.data = { ...execution.data, resultData }
+          }
+        } catch (dataError) {
+          console.log('Could not fetch separate result data:', dataError)
+        }
+      }
+
       return {
         success: true,
         data: execution

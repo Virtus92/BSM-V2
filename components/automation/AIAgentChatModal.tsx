@@ -1,30 +1,23 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Bot,
-  User,
   Send,
-  Loader2,
-  MessageSquare,
-  Clock,
-  CheckCircle,
-  Activity
+  User
 } from "lucide-react";
 import { WorkflowInsight } from '@/lib/services/workflow-analyzer';
 
 interface ChatMessage {
   id: string;
-  type: 'user' | 'agent' | 'system';
-  content: string;
+  text: string;
+  sender: 'user' | 'agent';
   timestamp: Date;
-  metadata?: any;
 }
 
 interface AIAgentChatModalProps {
@@ -36,13 +29,12 @@ interface AIAgentChatModalProps {
 
 export function AIAgentChatModal({ workflow, open, onOpenChange, initialMessage }: AIAgentChatModalProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [inputMessage, setInputMessage] = useState('');
+  const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isConnected, setIsConnected] = useState(false);
+  const [sessionId] = useState(() => `dashboard-session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const hasAutoSentRef = useRef(false);
 
-  // Auto-scroll to bottom when new messages arrive
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -51,155 +43,231 @@ export function AIAgentChatModal({ workflow, open, onOpenChange, initialMessage 
     scrollToBottom();
   }, [messages]);
 
-  // Focus input when modal opens and send initial message
   useEffect(() => {
-    if (open && inputRef.current) {
-      setTimeout(() => inputRef.current?.focus(), 100);
+    if (open && messages.length === 0 && workflow) {
+      // Add welcome message when chat opens for first time
+      setMessages([{
+        id: '1',
+        text: `Hallo! Ich bin der AI Agent für ${workflow.workflow.name}. Wie kann ich Ihnen helfen?`,
+        sender: 'agent',
+        timestamp: new Date()
+      }]);
     }
+  }, [open, workflow]);
 
-    // Send initial message if provided
-    if (open && initialMessage && initialMessage.trim() && workflow) {
-      setInputMessage(initialMessage);
+  // Autofill and auto-send initial message when provided
+  useEffect(() => {
+    if (!open) {
+      hasAutoSentRef.current = false;
+      return;
+    }
+    const prefill = (initialMessage || '').trim();
+    if (workflow && prefill && !hasAutoSentRef.current) {
+      setInputValue(prefill);
+      // Defer sending slightly to ensure UI mounts
       setTimeout(() => {
-        if (isConnected) {
-          sendMessage();
-        }
-      }, 1000);
+        sendMessage(prefill);
+        hasAutoSentRef.current = true;
+      }, 50);
     }
-  }, [open, initialMessage, workflow]);
+  // include initialMessage so it can resend for new prefill when reopened
+  }, [open, workflow, initialMessage]);
 
-  const initializeChat = useCallback(async () => {
-    if (!workflow) return;
+  // Get webhook URL for the chat trigger
+  const getChatWebhookUrl = async () => {
+    if (!workflow) return null;
 
-    setMessages([]);
-    setIsConnected(false);
-    setIsLoading(true);
-
+    // Try to get active webhooks from N8N API
     try {
-      // Test connection to AI agent
-      const response = await fetch('/api/automation/ai-agent/connect', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          workflowId: workflow.workflow.id,
-          action: 'connect'
-        })
-      });
-
+      const response = await fetch(`/api/automation/workflows/${workflow.workflow.id}/webhooks`);
       if (response.ok) {
-        setIsConnected(true);
-        addSystemMessage('Verbindung zum AI Agent hergestellt. Wie kann ich Ihnen helfen?');
+        const webhooks = await response.json();
+        console.log('Active webhooks from API:', webhooks);
 
-        // Add welcome suggestions based on workflow type
-        if (workflow.category === 'ai_agent') {
-          setTimeout(() => {
-            addSystemMessage('💡 Versuchen Sie: "Zeige mir die letzten Kundenanfragen" oder "Erstelle einen Testtermin"');
-          }, 1000);
+        // Look for chat trigger webhook
+        const chatWebhook = webhooks.find(w => w.method === 'POST' && w.path.includes('chat'));
+        if (chatWebhook) {
+          console.log('Found chat webhook:', chatWebhook);
+          return chatWebhook.url;
         }
-      } else {
-        addSystemMessage('❌ Fehler beim Verbinden mit dem AI Agent. Workflow könnte inaktiv sein.');
       }
-    } catch {
-      addSystemMessage('❌ Verbindungsfehler. Bitte überprüfen Sie die N8N Konfiguration.');
-    } finally {
-      setIsLoading(false);
+    } catch (apiError) {
+      console.log('Failed to get webhooks from API:', apiError);
     }
-  }, [workflow]);
 
-  // Initialize chat when workflow changes
-  useEffect(() => {
-    if (workflow && open) {
-      initializeChat();
+    const rawNodes = workflow.workflow.nodes || [];
+    console.log('All workflow nodes:', rawNodes.map(n => ({
+      id: n.id,
+      name: n.name,
+      type: n.type,
+      webhookId: n.webhookId,
+      parameters: n.parameters
+    })));
+
+    // Check if workflow has triggers array with webhook info
+    if (workflow.triggers) {
+      console.log('Workflow triggers:', workflow.triggers);
+      for (const trigger of workflow.triggers) {
+        if (trigger.webhookId) {
+          console.log('Found webhook in triggers:', trigger);
+          const baseUrl = process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL || 'https://n8n.dinel.at/webhook';
+          const url = `${baseUrl}/${trigger.webhookId}/chat`;
+          console.log('Using trigger webhook URL:', url);
+          return url;
+        }
+      }
     }
-  }, [workflow, open, initializeChat]);
 
-  const addSystemMessage = (content: string) => {
-    const message: ChatMessage = {
-      id: Date.now().toString(),
-      type: 'system',
-      content,
-      timestamp: new Date()
-    };
-    setMessages(prev => [...prev, message]);
+    // Check workflow settings for webhook info
+    if (workflow.settings) {
+      console.log('Workflow settings:', workflow.settings);
+    }
+
+    // Prioritize Chat Trigger nodes first
+    const chatTriggerNode = rawNodes.find(node =>
+      node.type === '@n8n/n8n-nodes-langchain.chatTrigger'
+    );
+
+    if (chatTriggerNode) {
+      console.log('Found Chat Trigger node:', chatTriggerNode);
+      console.log('Node parameters:', JSON.stringify(chatTriggerNode.parameters, null, 2));
+      console.log('Node webhookId:', chatTriggerNode.webhookId);
+      console.log('Full node object:', JSON.stringify(chatTriggerNode, null, 2));
+
+      // Try different possible webhook ID locations
+      const possibleWebhookIds = [
+        chatTriggerNode.parameters?.webhookId,
+        chatTriggerNode.parameters?.path,
+        chatTriggerNode.webhookId,
+        chatTriggerNode.id
+      ].filter(Boolean);
+
+      console.log('Possible webhook IDs:', possibleWebhookIds);
+
+      const webhookId = possibleWebhookIds[0];
+      const baseUrl = process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL || 'https://n8n.dinel.at/webhook';
+      const url = `${baseUrl}/${webhookId}/chat`;
+      console.log('Using Chat Trigger URL:', url);
+      return url;
+    }
+
+    // Fallback to regular webhook nodes
+    const webhookNode = rawNodes.find(node =>
+      node.type === 'n8n-nodes-base.webhook' && node.webhookId
+    );
+
+    if (webhookNode) {
+      console.log('Found Webhook node:', webhookNode);
+      const webhookId = webhookNode.webhookId;
+      const baseUrl = process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL || 'https://n8n.dinel.at/webhook';
+      const url = `${baseUrl}/${webhookId}`;
+      console.log('Using Webhook URL:', url);
+      return url;
+    }
+
+    console.log('No suitable webhook node found');
+    console.log('Available nodes:', rawNodes.map(n => ({ id: n.id, type: n.type, webhookId: n.webhookId })));
+    return null;
   };
 
-
-  const sendMessage = async () => {
-    if (!inputMessage.trim() || isLoading || !workflow || !isConnected) return;
+  const sendMessage = async (overrideText?: string) => {
+    const textSource = typeof overrideText === 'string' ? overrideText : inputValue;
+    const textToSend = textSource.trim();
+    if (!textToSend || isLoading || !workflow) return;
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
-      type: 'user',
-      content: inputMessage.trim(),
+      text: textToSend,
+      sender: 'user',
       timestamp: new Date()
     };
 
     setMessages(prev => [...prev, userMessage]);
-    setInputMessage('');
+    setInputValue('');
     setIsLoading(true);
 
     try {
-      // Send message to AI agent via webhook
-      const response = await fetch('/api/automation/ai-agent/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          workflowId: workflow.workflow.id,
-          message: userMessage.content,
-          userId: 'executive-dashboard',
-          timestamp: userMessage.timestamp.toISOString()
-        })
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-
-        // Direct webhook response - no polling bullshit
-        if (result.response) {
-          // Got response from webhook
-          const agentMessage: ChatMessage = {
-            id: (Date.now() + 1).toString(),
-            type: 'agent',
-            content: result.response,
-            timestamp: new Date(),
-            metadata: result.metadata
-          };
-          setMessages(prev => [...prev, agentMessage]);
-
-          // Handle any generated files or actions
-          if (result.files?.length > 0) {
-            addSystemMessage(`📎 ${result.files.length} Datei(en) wurden generiert und stehen zum Download bereit.`);
-          }
-
-          if (result.actions?.length > 0) {
-            addSystemMessage(`⚡ ${result.actions.length} Aktion(en) wurden ausgeführt: ${result.actions.map((a: any) => a.description).join(', ')}`);
-          }
-        } else {
-          // No response from webhook = error
-          addSystemMessage('❌ Workflow lieferte keine Antwort. Prüfen Sie den N8N Workflow auf "Respond to Webhook" node.');
-        }
-        setIsLoading(false);
-      } else {
-        const errorData = await response.json();
-        addSystemMessage(`❌ Fehler: ${errorData.error || 'Unbekannter Fehler beim Senden der Nachricht'}`);
+      const baseWebhookUrl = await getChatWebhookUrl();
+      if (!baseWebhookUrl) {
+        console.error('No webhook URL found for workflow:', workflow.workflow.name);
+        throw new Error('No webhook URL found');
       }
-    } catch {
-      addSystemMessage('❌ Netzwerkfehler beim Senden der Nachricht.');
+
+      const payload = {
+        chatInput: userMessage.text,
+        sessionId: sessionId,
+        source: 'executive-dashboard',
+        workflowId: workflow.workflow.id,
+        timestamp: new Date().toISOString()
+      };
+
+      console.log('Message payload:', payload);
+
+      // Try multiple webhook URL variations
+      const baseUrlWithoutChat = baseWebhookUrl.replace('/chat', '');
+      const urlsToTry = [
+        baseUrlWithoutChat,
+        baseUrlWithoutChat + '/chat',
+        baseUrlWithoutChat.replace('/webhook/', '/webhook-test/'),
+        baseUrlWithoutChat.replace('/webhook/', '/webhook-test/') + '/chat'
+      ];
+
+      let lastError = null;
+      for (const webhookUrl of urlsToTry) {
+        try {
+          console.log('Trying webhook URL:', webhookUrl);
+
+          const response = await fetch(webhookUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload)
+          });
+
+          console.log('Response status:', response.status);
+          const responseText = await response.text();
+          console.log('Response text:', responseText);
+
+          if (response.ok) {
+            const result = JSON.parse(responseText);
+            const agentMessage: ChatMessage = {
+              id: (Date.now() + 1).toString(),
+              text: result.output || result.response || 'Entschuldigung, ich konnte keine Antwort generieren.',
+              sender: 'agent',
+              timestamp: new Date()
+            };
+            setMessages(prev => [...prev, agentMessage]);
+            return; // Success, exit function
+          }
+
+          lastError = `HTTP ${response.status}: ${responseText}`;
+        } catch (fetchError) {
+          lastError = fetchError instanceof Error ? fetchError.message : 'Fetch failed';
+          console.log('Failed with URL:', webhookUrl, 'Error:', lastError);
+        }
+      }
+
+      throw new Error(lastError || 'All webhook URLs failed');
+    } catch (error) {
+      console.error('Error sending message:', error);
+      const errorMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        text: `Debug: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        sender: 'agent',
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
     }
-  };
-
-  const clearChat = () => {
-    setMessages([]);
-    addSystemMessage('Chat wurde zurückgesetzt.');
   };
 
   if (!workflow) return null;
@@ -208,84 +276,50 @@ export function AIAgentChatModal({ workflow, open, onOpenChange, initialMessage 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[95vw] sm:max-w-3xl lg:max-w-4xl h-[80vh] flex flex-col modern-card border-0">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center">
-              <Bot className="w-5 h-5 text-purple-500" />
+          <DialogTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center">
+                <Bot className="w-5 h-5 text-purple-500" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold">AI Agent Chat</h2>
+                <p className="text-sm text-muted-foreground">{workflow.workflow.name}</p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-lg font-bold">AI Agent Chat</h2>
-              <p className="text-sm text-muted-foreground">{workflow.workflow.name}</p>
-            </div>
-            <div className="ml-auto flex items-center gap-2">
-              <Badge variant={isConnected ? "default" : "secondary"}>
-                <div className={`w-2 h-2 rounded-full mr-2 ${
-                  isConnected ? 'bg-green-500 animate-pulse' : 'bg-gray-500'
-                }`} />
-                {isConnected ? 'Verbunden' : 'Getrennt'}
-              </Badge>
-            </div>
+            <Badge variant="default">
+              <div className="w-2 h-2 rounded-full mr-2 bg-green-500 animate-pulse" />
+              Verbunden
+            </Badge>
           </DialogTitle>
         </DialogHeader>
 
-        {/* Chat Messages */}
+        {/* Messages */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-white/[0.02] rounded-xl border border-white/[0.05]">
-          {messages.length === 0 && !isLoading && (
-            <div className="text-center py-8">
-              <MessageSquare className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">
-                Starten Sie eine Unterhaltung mit dem AI Agent
-              </p>
-            </div>
-          )}
-
           {messages.map((message) => (
-            <div key={message.id} className={`flex gap-3 ${
-              message.type === 'user' ? 'justify-end' : 'justify-start'
-            }`}>
-              <div className={`flex gap-3 max-w-[80%] ${
-                message.type === 'user' ? 'flex-row-reverse' : 'flex-row'
-              }`}>
+            <div
+              key={message.id}
+              className={`flex gap-3 ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+            >
+              <div className={`flex gap-3 max-w-[80%] ${message.sender === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
                 <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-                  {message.type === 'user' ? (
+                  {message.sender === 'user' ? (
                     <User className="w-4 h-4" />
-                  ) : message.type === 'agent' ? (
-                    <Bot className="w-4 h-4" />
                   ) : (
-                    <Activity className="w-4 h-4" />
+                    <Bot className="w-4 h-4" />
                   )}
                 </div>
-                <Card className={`${
-                  message.type === 'user'
-                    ? 'bg-primary text-primary-foreground'
-                    : message.type === 'system'
-                    ? 'bg-blue-500/10 border-blue-500/20'
-                    : 'bg-white/[0.05] border-white/[0.1]'
-                }`}>
-                  <CardContent className="p-3">
-                    <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                    <p className="text-xs opacity-60 mt-1">
-                      {message.timestamp.toLocaleTimeString('de-DE')}
-                    </p>
-
-                    {/* Metadata display for agent responses */}
-                    {message.metadata && (
-                      <div className="mt-2 pt-2 border-t border-white/[0.1] space-y-1">
-                        {message.metadata.executionTime && (
-                          <div className="flex items-center gap-1 text-xs opacity-80">
-                            <Clock className="w-3 h-3" />
-                            {message.metadata.executionTime}ms
-                          </div>
-                        )}
-                        {message.metadata.confidence && (
-                          <div className="flex items-center gap-1 text-xs opacity-80">
-                            <CheckCircle className="w-3 h-3" />
-                            {Math.round(message.metadata.confidence * 100)}% Konfidenz
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
+                <div
+                  className={`p-3 rounded-lg text-sm ${
+                    message.sender === 'user'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-white/[0.05] border border-white/[0.1]'
+                  }`}
+                >
+                  <p className="whitespace-pre-wrap">{message.text}</p>
+                  <p className="text-xs opacity-60 mt-1">
+                    {message.timestamp.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                </div>
               </div>
             </div>
           ))}
@@ -296,70 +330,37 @@ export function AIAgentChatModal({ workflow, open, onOpenChange, initialMessage 
                 <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
                   <Bot className="w-4 h-4" />
                 </div>
-                <Card className="bg-white/[0.05] border-white/[0.1]">
-                  <CardContent className="p-3">
-                    <div className="flex items-center gap-2">
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span className="text-sm">AI Agent antwortet...</span>
-                    </div>
-                  </CardContent>
-                </Card>
+                <div className="bg-white/[0.05] border border-white/[0.1] p-3 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce"></div>
+                    <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+                    <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                    <span className="text-sm ml-2">AI Agent antwortet...</span>
+                  </div>
+                </div>
               </div>
             </div>
           )}
-
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input Area */}
+        {/* Input */}
         <div className="space-y-3">
-          {/* Quick Suggestions */}
-          {isConnected && messages.length === 0 && !isLoading && (
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setInputMessage('Zeige mir die System-Statistiken')}
-              >
-                📊 System-Status
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setInputMessage('Erstelle einen Test-Termin für morgen')}
-              >
-                📅 Test-Termin
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setInputMessage('Was sind meine letzten Aktivitäten?')}
-              >
-                📝 Aktivitäten
-              </Button>
-            </div>
-          )}
-
           <div className="flex gap-2">
             <Input
-              ref={inputRef}
-              placeholder={isConnected ? "Nachricht an AI Agent..." : "Verbindung wird hergestellt..."}
-              value={inputMessage}
-              onChange={(e) => setInputMessage(e.target.value)}
-              onKeyPress={handleKeyPress}
-              disabled={!isConnected || isLoading}
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={handleKeyPress}
+              placeholder="Nachricht an AI Agent..."
+              disabled={isLoading}
               className="flex-1"
             />
             <Button
-              onClick={sendMessage}
-              disabled={!inputMessage.trim() || !isConnected || isLoading}
+              onClick={() => sendMessage()}
+              disabled={!inputValue.trim() || isLoading}
               className="mystery-button"
             >
-              {isLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Send className="w-4 h-4" />
-              )}
+              <Send className="w-4 h-4" />
             </Button>
           </div>
         </div>
@@ -370,9 +371,6 @@ export function AIAgentChatModal({ workflow, open, onOpenChange, initialMessage 
             <span>💡 Tipp: Nutzen Sie natürliche Sprache für Anfragen</span>
           </div>
           <div className="flex gap-2">
-            <Button variant="ghost" size="sm" onClick={clearChat}>
-              Chat löschen
-            </Button>
             <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
               Schließen
             </Button>

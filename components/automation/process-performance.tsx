@@ -19,18 +19,23 @@ import {
   AlertTriangle,
   BarChart3
 } from "lucide-react"
+import { ConversationModal } from './ConversationModal'
 import { type LiveMonitoring } from '@/lib/services/execution-controller'
+import { type WorkflowInsight } from '@/lib/services/workflow-analyzer'
 
 interface ProcessPerformanceProps {
   workflowId: string
   initialData: LiveMonitoring
+  insight: WorkflowInsight
   refreshInterval?: number
 }
 
-export function ProcessPerformance({ workflowId, initialData, refreshInterval = 5000 }: ProcessPerformanceProps) {
+export function ProcessPerformance({ workflowId, initialData, insight, refreshInterval = 5000 }: ProcessPerformanceProps) {
   const [monitoring, setMonitoring] = useState<LiveMonitoring>(initialData)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [autoRefresh, setAutoRefresh] = useState(true)
+  const [selectedExecution, setSelectedExecution] = useState<string | null>(null)
+  const [executionResult, setExecutionResult] = useState<any>(null)
 
   useEffect(() => {
     if (!autoRefresh) return
@@ -55,6 +60,42 @@ export function ProcessPerformance({ workflowId, initialData, refreshInterval = 
     } finally {
       setIsRefreshing(false)
     }
+  }
+
+  const fetchExecutionDetails = async (executionId: string) => {
+    try {
+      const response = await fetch(`/api/automation/executions/${executionId}`)
+      if (response.ok) {
+        const data = await response.json()
+        setExecutionResult(data)
+      }
+    } catch (error) {
+      console.error('Failed to fetch execution details:', error)
+    }
+  }
+
+  const handleExecutionClick = (executionId: string) => {
+    setSelectedExecution(executionId)
+
+    // Find execution in local data first
+    const execution = monitoring.recentExecutions.find(e => e.id === executionId)
+    if (execution) {
+      setExecutionResult({
+        success: execution.status === 'success',
+        executionId: execution.id,
+        status: execution.status,
+        startTime: execution.startedAt.toISOString(),
+        endTime: execution.finishedAt?.toISOString(),
+        duration: execution.finishedAt ?
+          execution.finishedAt.getTime() - execution.startedAt.getTime() : undefined,
+        data: execution.result,
+        progress: execution.progress,
+        workflowId: workflowId
+      })
+    }
+
+    // Also try to fetch from API for additional details
+    fetchExecutionDetails(executionId)
   }
 
   // System-oriented metrics
@@ -215,7 +256,11 @@ export function ProcessPerformance({ workflowId, initialData, refreshInterval = 
           <div className="space-y-2">
             {monitoring.recentExecutions.length > 0 ? (
               monitoring.recentExecutions.slice(0, 8).map((execution) => (
-                <div key={execution.id} className="p-3 rounded-lg bg-orange-500/5 border border-orange-500/20">
+                <div
+                  key={execution.id}
+                  className="p-3 rounded-lg bg-orange-500/5 border border-orange-500/20 cursor-pointer hover:bg-orange-500/10 transition-colors"
+                  onClick={() => handleExecutionClick(execution.id)}
+                >
                   <div className="flex items-center gap-3">
                     {execution.status === 'success' ? (
                       <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
@@ -259,6 +304,24 @@ export function ProcessPerformance({ workflowId, initialData, refreshInterval = 
           </div>
         </CardContent>
       </Card>
+
+      {/* Execution Detail Modal */}
+      {selectedExecution && (
+        <ExecutionResultModal
+          result={executionResult || {
+            success: true,
+            executionId: selectedExecution,
+            status: 'success'
+          }}
+          open={!!selectedExecution}
+          onOpenChange={(open) => {
+            if (!open) {
+              setSelectedExecution(null)
+              setExecutionResult(null)
+            }
+          }}
+        />
+      )}
     </div>
   )
 }

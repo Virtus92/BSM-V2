@@ -1,14 +1,15 @@
 import { Navigation } from "@/components/navigation";
 import { Hero } from "@/components/hero";
+import { LandingChat } from "@/components/landing-chat";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { 
-  ArrowRight, 
-  Users, 
-  FileText, 
-  BarChart3, 
-  Shield, 
-  Zap, 
+import {
+  ArrowRight,
+  Users,
+  FileText,
+  BarChart3,
+  Shield,
+  Zap,
   Clock,
   CheckCircle
 } from "lucide-react";
@@ -166,6 +167,9 @@ export default function Home() {
           </div>
         </footer>
       </main>
+
+      {/* Landing Page Chat */}
+      <LandingChat />
     </div>
   );
 }

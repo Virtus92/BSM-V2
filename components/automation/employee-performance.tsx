@@ -18,18 +18,22 @@ import {
   Users,
   Coffee
 } from "lucide-react"
+import { ConversationModal } from './ConversationModal'
 import { type LiveMonitoring } from '@/lib/services/execution-controller'
+import { type WorkflowInsight } from '@/lib/services/workflow-analyzer'
 
 interface EmployeePerformanceProps {
   workflowId: string
   initialData: LiveMonitoring
+  insight: WorkflowInsight
   refreshInterval?: number
 }
 
-export function EmployeePerformance({ workflowId, initialData, refreshInterval = 5000 }: EmployeePerformanceProps) {
+export function EmployeePerformance({ workflowId, initialData, insight, refreshInterval = 5000 }: EmployeePerformanceProps) {
   const [monitoring, setMonitoring] = useState<LiveMonitoring>(initialData)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [autoRefresh, setAutoRefresh] = useState(true)
+  const [selectedExecution, setSelectedExecution] = useState<any>(null)
 
   useEffect(() => {
     if (!autoRefresh) return
@@ -54,6 +58,132 @@ export function EmployeePerformance({ workflowId, initialData, refreshInterval =
     } finally {
       setIsRefreshing(false)
     }
+  }
+
+  // Group executions into conversations by sessionId
+  const groupExecutionsIntoConversations = async () => {
+    const conversationMap = new Map()
+
+    for (const execution of monitoring.recentExecutions) {
+      // Extract sessionId from execution result if available
+      let sessionId = 'unknown'
+
+      // Try to get sessionId from basic execution result first
+      if (execution.result?.json?.sessionId) {
+        sessionId = execution.result.json.sessionId
+      } else if (execution.result?.sessionId) {
+        sessionId = execution.result.sessionId
+      } else {
+        // If no sessionId in basic data, fetch detailed execution data
+        try {
+          const response = await fetch(`/api/automation/executions/${execution.id}`)
+          if (response.ok) {
+            const detailedExecution = await response.json()
+            // Extract sessionId from Chat Trigger node
+            const chatTriggerData = detailedExecution?.data?.resultData?.runData?.["Chat Trigger"]?.[0]?.data?.main?.[0]?.[0]?.json
+            if (chatTriggerData?.sessionId) {
+              sessionId = chatTriggerData.sessionId
+            } else {
+              // Fallback: use execution ID as session for individual messages
+              sessionId = execution.id
+            }
+          } else {
+            sessionId = execution.id
+          }
+        } catch (error) {
+          console.error(`Failed to fetch sessionId for execution ${execution.id}:`, error)
+          sessionId = execution.id
+        }
+      }
+
+      if (!conversationMap.has(sessionId)) {
+        conversationMap.set(sessionId, {
+          sessionId,
+          executions: [],
+          startTime: execution.startedAt,
+          endTime: execution.finishedAt || execution.startedAt,
+          status: execution.status,
+          messageCount: 0
+        })
+      }
+
+      const conversation = conversationMap.get(sessionId)
+      conversation.executions.push(execution)
+      conversation.messageCount++
+
+      // Update time range
+      if (execution.startedAt < conversation.startTime) {
+        conversation.startTime = execution.startedAt
+      }
+      if (execution.finishedAt && execution.finishedAt > conversation.endTime) {
+        conversation.endTime = execution.finishedAt
+      }
+
+      // Update status (error takes precedence)
+      if (execution.status === 'error') {
+        conversation.status = 'error'
+      } else if (execution.status === 'running' && conversation.status === 'success') {
+        conversation.status = 'running'
+      }
+    }
+
+    // Sort conversations by start time (newest first)
+    return Array.from(conversationMap.values()).sort((a, b) => {
+      const aTime = a.startTime instanceof Date ? a.startTime.getTime() : new Date(a.startTime).getTime()
+      const bTime = b.startTime instanceof Date ? b.startTime.getTime() : new Date(b.startTime).getTime()
+      return bTime - aTime
+    })
+  }
+
+  const [conversations, setConversations] = useState<any[]>([])
+  const [isLoadingConversations, setIsLoadingConversations] = useState(false)
+
+  useEffect(() => {
+    const loadConversations = async () => {
+      setIsLoadingConversations(true)
+      try {
+        const conversationList = await groupExecutionsIntoConversations()
+        setConversations(conversationList)
+      } catch (error) {
+        console.error('Failed to load conversations:', error)
+        setConversations([])
+      } finally {
+        setIsLoadingConversations(false)
+      }
+    }
+
+    loadConversations()
+  }, [monitoring.recentExecutions])
+
+  const handleConversationClick = (conversation: any) => {
+    setSelectedExecution(conversation)
+  }
+
+  const getConversationTopic = (conversation: any) => {
+    // Try to extract topic from first message
+    const firstExecution = conversation.executions[0]
+    if (firstExecution?.result?.json?.input || firstExecution?.result?.json?.message) {
+      const input = firstExecution.result.json.input || firstExecution.result.json.message
+      if (input.length > 30) {
+        return input.substring(0, 30) + '...'
+      }
+      return input
+    }
+    return 'Kundenkonversation'
+  }
+
+  const formatDuration = (startTime: Date | string, endTime: Date | string) => {
+    const start = startTime instanceof Date ? startTime : new Date(startTime)
+    const end = endTime instanceof Date ? endTime : new Date(endTime)
+
+    const diff = end.getTime() - start.getTime()
+    const minutes = Math.floor(diff / 60000)
+    const seconds = Math.floor((diff % 60000) / 1000)
+
+    if (minutes > 0) {
+      return `${minutes}min ${seconds}s`
+    }
+    return `${seconds}s`
   }
 
   // Human-oriented metrics
@@ -169,7 +299,14 @@ export function EmployeePerformance({ workflowId, initialData, refreshInterval =
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-2xl font-bold text-purple-600">{Math.round(monitoring.metrics.averageResponseTime / 60000)}min</p>
+                <p className="text-2xl font-bold text-purple-600">
+                  {monitoring.metrics.averageResponseTime < 1000
+                    ? `${monitoring.metrics.averageResponseTime}ms`
+                    : monitoring.metrics.averageResponseTime < 60000
+                    ? `${Math.round(monitoring.metrics.averageResponseTime / 1000)}s`
+                    : `${Math.round(monitoring.metrics.averageResponseTime / 60000)}min`
+                  }
+                </p>
                 <p className="text-xs text-muted-foreground">Ø Antwortzeit</p>
               </div>
               <Clock className="w-4 h-4 text-purple-500" />
@@ -203,44 +340,72 @@ export function EmployeePerformance({ workflowId, initialData, refreshInterval =
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
-            {monitoring.recentExecutions.length > 0 ? (
-              monitoring.recentExecutions.slice(0, 5).map((execution) => (
-                <div key={execution.id} className="p-3 rounded-lg bg-purple-500/5 border border-purple-500/20">
+            {isLoadingConversations ? (
+              <div className="flex items-center justify-center py-6">
+                <RefreshCw className="w-6 h-6 animate-spin mr-2" />
+                <span>Lade Konversationen...</span>
+              </div>
+            ) : conversations.length > 0 ? (
+              conversations.slice(0, 5).map((conversation) => (
+                <div
+                  key={conversation.sessionId}
+                  className="p-3 rounded-lg bg-purple-500/5 border border-purple-500/20 cursor-pointer hover:bg-purple-500/10 transition-colors"
+                  onClick={() => handleConversationClick(conversation)}
+                >
                   <div className="flex items-center gap-3">
-                    {execution.status === 'success' ? (
-                      <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
-                    ) : execution.status === 'error' ? (
-                      <XCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
-                    ) : (
-                      <RefreshCw className="w-4 h-4 text-yellow-500 animate-spin flex-shrink-0" />
-                    )}
+                    <div className="flex-shrink-0">
+                      {conversation.status === 'success' ? (
+                        <MessageSquare className="w-4 h-4 text-green-500" />
+                      ) : conversation.status === 'error' ? (
+                        <XCircle className="w-4 h-4 text-red-500" />
+                      ) : (
+                        <RefreshCw className="w-4 h-4 text-yellow-500 animate-spin" />
+                      )}
+                    </div>
                     <div className="flex-1">
                       <p className="font-medium text-sm">
-                        {execution.status === 'success' ? '✅ Aufgabe erfolgreich erledigt' :
-                         execution.status === 'error' ? '❌ Aufgabe benötigt Hilfe' :
-                         '🔄 Arbeitet an Aufgabe'}
+                        💬 {getConversationTopic(conversation)}
                       </p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(execution.startedAt).toLocaleString('de-DE', {
-                          day: '2-digit',
-                          month: '2-digit',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })} • {execution.id.slice(0, 8)}...
-                      </p>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span>
+                          {(conversation.startTime instanceof Date ?
+                            conversation.startTime :
+                            new Date(conversation.startTime)
+                          ).toLocaleString('de-DE', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </span>
+                        <span>•</span>
+                        <span>{conversation.messageCount} Nachrichten</span>
+                        <span>•</span>
+                        <span>{formatDuration(conversation.startTime, conversation.endTime)}</span>
+                      </div>
                     </div>
                   </div>
                 </div>
               ))
             ) : (
               <div className="text-center py-6 text-muted-foreground">
-                <Users className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                <p>Noch keine Arbeitshistorie</p>
+                <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                <p>Noch keine Konversationen</p>
               </div>
             )}
           </div>
         </CardContent>
       </Card>
+
+      {/* Conversation Modal */}
+      {selectedExecution && (
+        <ConversationModal
+          conversation={selectedExecution}
+          viewType="digital_employee"
+          open={!!selectedExecution}
+          onClose={() => setSelectedExecution(null)}
+        />
+      )}
     </div>
   )
 }

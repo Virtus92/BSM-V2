@@ -51,7 +51,7 @@ export default async function PortalPage() {
   }
 
   // Ensure we have a customer record linked to this user
-  await ensureCustomerRecord(user.id, user.email, user.user_metadata?.full_name)
+  await ensureCustomerRecord(user.id, user.email ?? null, user.user_metadata?.full_name ?? null)
 
   // Load own requests (admin client filters to current user only)
   const admin = createAdminClient()
@@ -104,4 +104,3 @@ export default async function PortalPage() {
     </div>
   )
 }
-
