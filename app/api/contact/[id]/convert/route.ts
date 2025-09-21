@@ -30,7 +30,7 @@ export async function POST(
       company: string
       phone: string
       status: CustomerStatus
-      notes: string
+      notes: string  // Will be stored in customer_notes table
     }>
 
     const overrides: Overrides = await request.json().catch(() => ({} as Overrides));
@@ -96,11 +96,12 @@ export async function POST(
       email: contactRequest.email,
       phone: overrides?.phone ?? contactRequest.phone,
       status: (overrides?.status ?? 'prospect') as CustomerStatus,
-      notes:
-        overrides?.notes ??
-        `Erstellt aus Kontaktanfrage: ${contactRequest.subject}\n\nUrsprüngliche Nachricht:\n${contactRequest.message}`,
       created_by: user.id
     } as const;
+
+    // Store notes content for separate customer_notes table
+    const noteContent = overrides?.notes ??
+      `Erstellt aus Kontaktanfrage: ${contactRequest.subject}\n\nUrsprüngliche Nachricht:\n${contactRequest.message}`;
 
     const { data: newCustomer, error: customerError } = await adminClient
       .from('customers')
@@ -130,6 +131,18 @@ export async function POST(
       console.error('Error updating contact request after conversion:', updateError);
       // Note: do not fail the whole request here
     }
+
+    // Create customer note with conversion details
+    await adminClient
+      .from('customer_notes')
+      .insert({
+        customer_id: newCustomer.id,
+        title: 'Erstellt aus Kontaktanfrage',
+        content: noteContent,
+        note_type: 'general',
+        is_internal: false,
+        created_by: user.id
+      });
 
     // Add an internal note about conversion
     await adminClient

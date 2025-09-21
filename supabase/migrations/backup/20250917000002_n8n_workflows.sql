@@ -1,4 +1,4 @@
--- N8N Workflow Integration Tables
+-- N8N Workflow Integration Tables (renamed for correct execution order)
 -- Stores local workflow metadata and execution tracking for customer automation dashboard
 
 -- Workflow registry table

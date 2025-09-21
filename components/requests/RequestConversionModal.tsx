@@ -133,14 +133,15 @@ export function RequestConversionModal({
   useEffect(() => {
     if (open && request) {
       if (isAlreadyConverted && convertedCustomerId) {
-        // Request is already converted, go directly to success
-        setStep('success');
-        setCreatedCustomerId(convertedCustomerId);
+        // Request is already converted, close modal and redirect to customer
+        router.push(`/dashboard/crm/${convertedCustomerId}`);
+        onOpenChange(false);
+        return;
       } else if (step === 'checking') {
         checkExistingCustomers();
       }
     }
-  }, [open, request, step, isAlreadyConverted, convertedCustomerId, checkExistingCustomers]);
+  }, [open, request, step, isAlreadyConverted, convertedCustomerId, checkExistingCustomers, router, onOpenChange]);
 
   const handleCreateNew = async () => {
     if (!request) return;
@@ -156,7 +157,7 @@ export function RequestConversionModal({
           contact_person: formData.contact_person,
           email: formData.email,
           phone: formData.phone || null,
-          notes: formData.notes || null,
+          // notes will be created separately in customer_notes table
           status: 'active'
         })
         .select()
@@ -167,6 +168,20 @@ export function RequestConversionModal({
         setError(`Fehler beim Erstellen des Kunden: ${customerError.message}`);
         setStep('error');
         return;
+      }
+
+      // Create customer note if notes exist
+      if (formData.notes) {
+        await supabase
+          .from('customer_notes')
+          .insert({
+            customer_id: customer.id,
+            title: 'Konvertierung aus Kontaktanfrage',
+            content: formData.notes,
+            note_type: 'general',
+            is_internal: false,
+            created_by: (await supabase.auth.getUser()).data.user?.id
+          });
       }
 
       // Update request with customer reference
@@ -246,15 +261,15 @@ export function RequestConversionModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto modern-card border-0">
-        <DialogHeader className="pb-6 border-b border-white/[0.08]">
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-purple-500/10 flex items-center justify-center">
-              <UserPlus className="w-8 h-8 text-purple-500" />
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto modern-card border-0 mx-4">
+        <DialogHeader className="pb-4 sm:pb-6 border-b border-white/[0.08]">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+            <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl bg-purple-500/10 flex items-center justify-center flex-shrink-0">
+              <UserPlus className="w-6 h-6 sm:w-8 sm:h-8 text-purple-500" />
             </div>
-            <div>
-              <DialogTitle className="text-2xl font-bold">Anfrage zu Kunde konvertieren</DialogTitle>
-              <DialogDescription className="text-base">
+            <div className="min-w-0 flex-1">
+              <DialogTitle className="text-lg sm:text-2xl font-bold leading-tight">Anfrage zu Kunde konvertieren</DialogTitle>
+              <DialogDescription className="text-sm sm:text-base mt-1 line-clamp-2">
                 {request.subject} → Kunde erstellen oder verknüpfen
               </DialogDescription>
             </div>
@@ -270,19 +285,19 @@ export function RequestConversionModal({
             </div>
             <ContactRequestStatusBadge status={request.status || 'new'} size="sm" />
           </div>
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+            <div className="truncate">
               <span className="text-muted-foreground">E-Mail:</span>
-              <span className="ml-2">{request.email}</span>
+              <span className="ml-2 break-all">{request.email}</span>
             </div>
             {request.company && (
-              <div>
+              <div className="truncate">
                 <span className="text-muted-foreground">Firma:</span>
                 <span className="ml-2">{request.company}</span>
               </div>
             )}
             {request.phone && (
-              <div>
+              <div className="truncate">
                 <span className="text-muted-foreground">Telefon:</span>
                 <span className="ml-2">{request.phone}</span>
               </div>

@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
       country: v.country || null,
       industry: v.industry || null,
       status: (v.status || 'prospect'),
-      notes: v.notes || null,
+      // notes removed - now handled via customer_notes table
       tags: v.tags || null,
       created_by: user.id
     };

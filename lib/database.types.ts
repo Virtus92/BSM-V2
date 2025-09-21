@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "13.0.4"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       contact_request_notes: {
@@ -237,7 +262,6 @@ export type Database = {
           email: string | null
           id: string
           industry: string | null
-          notes: string | null
           phone: string | null
           postal_code: string | null
           state: string | null
@@ -268,7 +292,6 @@ export type Database = {
           email?: string | null
           id?: string
           industry?: string | null
-          notes?: string | null
           phone?: string | null
           postal_code?: string | null
           state?: string | null
@@ -299,7 +322,6 @@ export type Database = {
           email?: string | null
           id?: string
           industry?: string | null
-          notes?: string | null
           phone?: string | null
           postal_code?: string | null
           state?: string | null
@@ -559,12 +581,6 @@ export type Database = {
       }
     }
     Enums: {
-      contact_request_status:
-        | "new"
-        | "in_progress"
-        | "responded"
-        | "converted"
-        | "archived"
       customer_status: "prospect" | "active" | "inactive" | "archived"
       priority_level: "low" | "medium" | "high" | "critical"
     }
@@ -692,15 +708,11 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
-      contact_request_status: [
-        "new",
-        "in_progress",
-        "responded",
-        "converted",
-        "archived",
-      ],
       customer_status: ["prospect", "active", "inactive", "archived"],
       priority_level: ["low", "medium", "high", "critical"],
     },

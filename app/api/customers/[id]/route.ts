@@ -91,7 +91,7 @@ export async function PUT(
     if (v.country !== undefined) updateData.country = v.country || null
     if (v.industry !== undefined) updateData.industry = v.industry || null
     if (v.status !== undefined) updateData.status = v.status
-    if (v.notes !== undefined) updateData.notes = v.notes || null
+    // Notes are now handled via separate customer_notes table
     if (v.tags !== undefined) updateData.tags = v.tags || null
 
     const { data, error } = await adminClient

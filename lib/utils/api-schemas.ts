@@ -40,7 +40,7 @@ export interface CustomerCreateRequest {
   status?: CustomerStatus | null
   priority?: PriorityLevel | null
   source?: string | null
-  notes?: string | null
+  // notes removed - now handled via separate customer_notes table
   tags?: string[] | null
 }
 
@@ -115,7 +115,7 @@ export class ApiSchemaValidator {
     const status = typeof data.status === 'string' ? (data.status as CustomerStatus) : undefined
     const priority = typeof data.priority === 'string' ? (data.priority as PriorityLevel) : undefined
     const source = typeof data.source === 'string' ? data.source : undefined
-    const notes = typeof data.notes === 'string' ? data.notes : undefined
+    // notes handling removed - now via separate customer_notes table
     const tags = data.tags
 
     const validator = createValidator()
@@ -155,7 +155,7 @@ export class ApiSchemaValidator {
     }
 
     // Validate string fields length
-    const stringFields = ['street', 'city', 'postal_code', 'country', 'industry', 'source', 'notes']
+    const stringFields = ['street', 'city', 'postal_code', 'country', 'industry', 'source']
     stringFields.forEach(field => {
       const v = data[field as keyof typeof data]
       if (typeof v === 'string') {
@@ -195,7 +195,7 @@ export class ApiSchemaValidator {
       status: status || 'prospect',
       priority: priority || 'medium',
       source: source?.trim() || null,
-      notes: notes?.trim() || null,
+      // notes removed - handled via separate customer_notes table
       tags: Array.isArray(tags) && tags.length > 0 ? (tags as string[]) : null
     }
 

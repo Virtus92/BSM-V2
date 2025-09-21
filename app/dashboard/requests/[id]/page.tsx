@@ -1,5 +1,3 @@
-'use server';
-
 import { notFound } from 'next/navigation';
 import { getContactRequestById } from '@/lib/database';
 import { Button } from '@/components/ui/button';
@@ -21,6 +19,8 @@ import {
 } from 'lucide-react';
 import { formatDate, formatDateTime } from '@/lib/utils/formatters';
 import ContactRequestNotes from '@/components/requests/contact-request-notes';
+import { RequestDetailActions } from '@/components/requests/RequestDetailActions';
+import { RequestStatusDropdown } from '@/components/requests/RequestStatusDropdown';
 import type { ContactRequestStatus, PriorityLevel } from '@/lib/shared-types';
 
 type Props = { params: Promise<{ id: string }> };
@@ -42,21 +42,7 @@ export default async function ContactRequestDetailPage({ params }: Props) {
               Zurück
             </Button>
           </Link>
-          <div className="flex items-center gap-2">
-            {request.converted_customer ? (
-              <Link href={`/dashboard/crm/${request.converted_customer.id}`} className="inline-flex">
-                <Button size="sm" variant="outline" className="h-8">
-                  <UserPlus className="w-4 h-4 mr-2" />
-                  Kunde ansehen
-                </Button>
-              </Link>
-            ) : (
-              <Button size="sm" variant="outline" className="h-8" disabled>
-                <UserPlus className="w-4 h-4 mr-2" />
-                Zu Kunde konvertieren
-              </Button>
-            )}
-          </div>
+          <RequestDetailActions request={request} />
         </div>
 
         {/* Bottom row: Icon + Title + Contact + Badges */}
@@ -204,10 +190,10 @@ export default async function ContactRequestDetailPage({ params }: Props) {
                   </Button>
                 </a>
               )}
-              <Button variant="outline" className="w-full col-span-2" disabled>
-                <Edit className="w-4 h-4 mr-2" />
-                Status ändern
-              </Button>
+              <RequestStatusDropdown
+                requestId={request.id}
+                currentStatus={(request.status || 'new') as ContactRequestStatus}
+              />
             </div>
           </div>
 
@@ -235,6 +221,7 @@ export default async function ContactRequestDetailPage({ params }: Props) {
           </div>
         </div>
       </div>
+
     </div>
   );
 }

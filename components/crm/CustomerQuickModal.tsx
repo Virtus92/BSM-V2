@@ -209,7 +209,7 @@ export function CustomerQuickModal({ customer, open, onOpenChange, onEdit }: Cus
           </div>
 
           {/* Additional Info */}
-          {(customer.notes || customer.tags?.length) && (
+          {(customer.tags?.length) && (
             <div className="space-y-3 pt-4 border-t border-white/[0.08]">
               {customer.tags && customer.tags.length > 0 && (
                 <div>
@@ -223,14 +223,7 @@ export function CustomerQuickModal({ customer, open, onOpenChange, onEdit }: Cus
                   </div>
                 </div>
               )}
-              {customer.notes && (
-                <div>
-                  <p className="text-sm font-medium mb-2">Notizen:</p>
-                  <p className="text-sm text-muted-foreground bg-background/30 p-3 rounded-lg">
-                    {customer.notes}
-                  </p>
-                </div>
-              )}
+              {/* Notes now handled via separate customer_notes system */}
             </div>
           )}
 

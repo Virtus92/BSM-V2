@@ -157,7 +157,7 @@ export class CustomerService {
         country: customerData.country || null,
         industry: customerData.industry || null,
         status: (customerData.status ?? 'prospect'),
-        notes: customerData.notes ?? null,
+        // notes removed - now handled via customer_notes table
         tags: customerData.tags || null,
       }
 
