@@ -35,6 +35,12 @@ export class ContactRequestService {
     if (filters?.status && filters.status !== 'all') {
       params.append('status', filters.status)
     }
+    if (filters?.assignedTo) {
+      params.append('assignedTo', filters.assignedTo)
+    }
+    if (filters?.includeUnassigned) {
+      params.append('includeUnassigned', String(filters.includeUnassigned))
+    }
 
     const url = params.toString() ? `/api/contact?${params.toString()}` : '/api/contact'
     const response = await fetch(url)
@@ -48,8 +54,11 @@ export class ContactRequestService {
       throw new Error(message)
     }
 
-    const { requests } = (await response.json()) as { requests: ContactRequestWithRelations[] }
-    let result: ContactRequestWithRelations[] = requests || []
+    const raw = await response.json() as any
+    // Accept multiple response shapes: { requests }, { data: { requests } }, or direct array
+    const extracted: ContactRequestWithRelations[] =
+      raw?.requests || raw?.data?.requests || (Array.isArray(raw?.data) ? raw.data : []) || []
+    let result: ContactRequestWithRelations[] = extracted || []
 
     // Apply additional filters client-side
     if (filters?.priority && filters.priority !== 'all') {
@@ -58,9 +67,7 @@ export class ContactRequestService {
     if (filters?.source) {
       result = result.filter((r) => r.source === filters.source)
     }
-    if (filters?.assignedTo) {
-      result = result.filter((r) => r.assigned_to === filters.assignedTo)
-    }
+    // assignedTo is handled server-side now
     if (filters?.search) {
       const searchTerm = filters.search.toLowerCase()
       result = result.filter((request) =>

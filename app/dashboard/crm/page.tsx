@@ -10,7 +10,7 @@ import { useCustomers } from "@/lib/hooks/useCustomers";
 import { CustomerStats } from "@/components/crm/CustomerStats";
 import { CustomerFilters } from "@/components/crm/CustomerFilters";
 import { CustomerList } from "@/components/crm/CustomerList";
-import { CustomerQuickModal } from "@/components/crm/CustomerQuickModal";
+import { CustomerDetailModal } from "@/components/crm/CustomerDetailModal";
 import { CustomerForm } from "@/components/crm/CustomerForm";
 import type { Customer } from "@/lib/shared-types";
 // Services only used via API routes
@@ -190,15 +190,12 @@ export default function CRMPage() {
         onCreate={() => setShowCreateForm(true)}
       />
 
-      {/* Customer Quick Modal */}
-      <CustomerQuickModal
-        customer={quickModalCustomer}
+      {/* Customer Detail Modal */}
+      <CustomerDetailModal
         open={!!quickModalCustomer}
         onOpenChange={(open) => !open && setQuickModalCustomer(null)}
-        onEdit={(customer) => {
-          setQuickModalCustomer(null);
-          setEditCustomer(customer);
-        }}
+        customerId={quickModalCustomer?.id || null}
+        onUpdated={() => refetch()}
       />
 
       {/* Customer Create Form */}

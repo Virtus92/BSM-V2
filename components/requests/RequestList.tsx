@@ -15,6 +15,8 @@ interface RequestListProps {
   isConvertible: (request: ContactRequestWithRelations) => boolean;
   formatDate: (date: string) => string;
   converting: string | null;
+  // Base path for detail links; defaults to dashboard context
+  baseHref?: string; // e.g., '/workspace/requests' or '/dashboard/requests'
 }
 
 export function RequestList({
@@ -23,7 +25,8 @@ export function RequestList({
   onConvertToCustomer,
   isConvertible,
   formatDate,
-  converting
+  converting,
+  baseHref = '/dashboard/requests'
 }: RequestListProps) {
   const [conversionModalRequest, setConversionModalRequest] = useState<ContactRequestWithRelations | null>(null);
 
@@ -76,7 +79,7 @@ export function RequestList({
             >
               <div className="mb-3">
                 <div onClick={() => onRequestClick(request)} className="cursor-pointer">
-                  <Link href={`/dashboard/requests/${request.id}`}>
+                  <Link href={`${baseHref}/${request.id}`}>
                     <h4 className="font-semibold group-hover:text-primary transition-colors line-clamp-1 mb-2">
                       {request.subject}
                     </h4>
@@ -120,7 +123,7 @@ export function RequestList({
 
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Link href={`/dashboard/requests/${request.id}`}>
+                  <Link href={`${baseHref}/${request.id}`}>
                     <Button variant="ghost" size="sm" className="hover:bg-primary/10">
                       <ExternalLink className="w-4 h-4 mr-2" />
                       Öffnen
@@ -175,7 +178,7 @@ export function RequestList({
               >
                 <div className="col-span-2">
                   <div className="space-y-1">
-                    <Link href={`/dashboard/requests/${request.id}`}>
+                    <Link href={`${baseHref}/${request.id}`}>
                       <p className="font-medium group-hover:text-primary transition-colors line-clamp-1">
                         {request.subject}
                       </p>
@@ -232,7 +235,7 @@ export function RequestList({
                 </div>
                 <div className="text-right">
                   <div className="flex items-center gap-1 justify-end">
-                    <Link href={`/dashboard/requests/${request.id}`}>
+                    <Link href={`${baseHref}/${request.id}`}>
                       <Button
                         variant="ghost"
                         size="sm"

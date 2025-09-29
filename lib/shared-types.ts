@@ -235,6 +235,7 @@ export interface ContactRequestFilters {
   priority?: PriorityLevel | 'all'
   source?: string
   assignedTo?: string
+  includeUnassigned?: boolean
 }
 
 // === Statistics Types ===

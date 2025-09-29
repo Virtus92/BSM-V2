@@ -21,6 +21,7 @@ import { formatDate, formatDateTime } from '@/lib/utils/formatters';
 import ContactRequestNotes from '@/components/requests/contact-request-notes';
 import { RequestDetailActions } from '@/components/requests/RequestDetailActions';
 import { RequestStatusDropdown } from '@/components/requests/RequestStatusDropdown';
+import { CreateTaskFromRequestButton } from '@/components/requests/CreateTaskFromRequestButton';
 import type { ContactRequestStatus, PriorityLevel } from '@/lib/shared-types';
 
 type Props = { params: Promise<{ id: string }> };
@@ -190,6 +191,18 @@ export default async function ContactRequestDetailPage({ params }: Props) {
                   </Button>
                 </a>
               )}
+              <CreateTaskFromRequestButton
+                request={{
+                  id: request.id,
+                  subject: request.subject,
+                  message: request.message,
+                  name: request.name,
+                  email: request.email
+                }}
+                customerId={request.converted_customer?.id}
+                variant="outline"
+                className="w-full"
+              />
               <RequestStatusDropdown
                 requestId={request.id}
                 currentStatus={(request.status || 'new') as ContactRequestStatus}

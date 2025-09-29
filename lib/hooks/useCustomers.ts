@@ -73,7 +73,10 @@ export function useCustomers(options: UseCustomersOptions = {}): UseCustomersRet
       setError(null)
 
       // Use API route instead of direct service call
-      const response = await fetch('/api/customers')
+      const params = new URLSearchParams()
+      if (filters.assignedTo) params.append('assignedTo', filters.assignedTo)
+      const url = params.toString() ? `/api/customers?${params.toString()}` : '/api/customers'
+      const response = await fetch(url)
       if (!response.ok) {
         throw new Error('Failed to fetch customers')
       }
@@ -86,7 +89,7 @@ export function useCustomers(options: UseCustomersOptions = {}): UseCustomersRet
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [filters.assignedTo])
 
   // Auto-load on mount and filter changes
   useEffect(() => {

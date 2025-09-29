@@ -201,6 +201,21 @@ export function RequestConversionModal({
         return;
       }
 
+      // Auto-assign to current user when converting
+      try {
+        const assignResponse = await fetch(`/api/requests/${request.id}/assign`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ selfAssign: true })
+        });
+
+        if (!assignResponse.ok) {
+          console.warn('Auto-assignment failed during conversion, but conversion was successful');
+        }
+      } catch (assignError) {
+        console.warn('Auto-assignment failed during conversion:', assignError);
+      }
+
       setCreatedCustomerId(customer.id);
       setStep('success');
 
@@ -235,6 +250,21 @@ export function RequestConversionModal({
         setError(`Fehler beim Verknüpfen mit Kunde: ${requestError.message}`);
         setStep('error');
         return;
+      }
+
+      // Auto-assign to current user when converting
+      try {
+        const assignResponse = await fetch(`/api/requests/${request.id}/assign`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ selfAssign: true })
+        });
+
+        if (!assignResponse.ok) {
+          console.warn('Auto-assignment failed during conversion, but conversion was successful');
+        }
+      } catch (assignError) {
+        console.warn('Auto-assignment failed during conversion:', assignError);
       }
 
       setStep('success');
@@ -285,21 +315,21 @@ export function RequestConversionModal({
             </div>
             <ContactRequestStatusBadge status={request.status || 'new'} size="sm" />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-            <div className="truncate">
-              <span className="text-muted-foreground">E-Mail:</span>
-              <span className="ml-2 break-all">{request.email}</span>
+          <div className="space-y-2 text-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+              <span className="text-muted-foreground text-xs sm:text-sm font-medium min-w-fit">E-Mail:</span>
+              <span className="text-xs sm:text-sm break-all">{request.email}</span>
             </div>
             {request.company && (
-              <div className="truncate">
-                <span className="text-muted-foreground">Firma:</span>
-                <span className="ml-2">{request.company}</span>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                <span className="text-muted-foreground text-xs sm:text-sm font-medium min-w-fit">Firma:</span>
+                <span className="text-xs sm:text-sm truncate">{request.company}</span>
               </div>
             )}
             {request.phone && (
-              <div className="truncate">
-                <span className="text-muted-foreground">Telefon:</span>
-                <span className="ml-2">{request.phone}</span>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                <span className="text-muted-foreground text-xs sm:text-sm font-medium min-w-fit">Telefon:</span>
+                <span className="text-xs sm:text-sm">{request.phone}</span>
               </div>
             )}
           </div>
@@ -327,7 +357,7 @@ export function RequestConversionModal({
                     <AlertTriangle className="w-5 h-5 text-yellow-500" />
                     <span className="font-medium text-yellow-400">Mögliche Duplikate gefunden</span>
                   </div>
-                  <p className="text-sm text-yellow-300 mb-4">
+                  <p className="text-xs sm:text-sm text-yellow-300 mb-4 break-words">
                     Es wurden {existingCustomers.length} ähnliche Kunden gefunden.
                     Möchten Sie mit einem bestehenden Kunden verknüpfen oder einen neuen erstellen?
                   </p>
@@ -344,13 +374,13 @@ export function RequestConversionModal({
                             : 'border-white/10 hover:border-white/20 bg-background/30'
                         }`}
                       >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium">{customer.company_name}</p>
-                            <p className="text-sm text-muted-foreground">{customer.email}</p>
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium truncate">{customer.company_name}</p>
+                            <p className="text-sm text-muted-foreground truncate">{customer.email}</p>
                           </div>
                           {customer.contact_person && (
-                            <span className="text-sm text-muted-foreground">{customer.contact_person}</span>
+                            <span className="text-sm text-muted-foreground truncate">{customer.contact_person}</span>
                           )}
                         </div>
                       </div>
@@ -467,17 +497,18 @@ export function RequestConversionModal({
                 />
               </div>
 
-              <div className="flex justify-between pt-6 border-t border-white/[0.08]">
+              <div className="flex flex-col sm:flex-row justify-between gap-3 pt-6 border-t border-white/[0.08]">
                 <Button
                   variant="outline"
                   onClick={() => setStep('decision')}
+                  className="w-full sm:w-auto"
                 >
                   Zurück
                 </Button>
                 <Button
                   onClick={handleCreateNew}
                   disabled={!formData.contact_person || !formData.email}
-                  className="mystery-button"
+                  className="mystery-button w-full sm:w-auto"
                 >
                   Kunde erstellen
                   <ArrowRight className="w-4 h-4 ml-2" />
@@ -508,7 +539,7 @@ export function RequestConversionModal({
               <h3 className="font-semibold text-lg mb-2">
                 {isAlreadyConverted ? 'Bereits konvertiert!' : 'Erfolgreich konvertiert!'}
               </h3>
-              <p className="text-muted-foreground mb-6">
+              <p className="text-muted-foreground mb-6 text-sm sm:text-base text-center px-2">
                 {isAlreadyConverted
                   ? `Diese Anfrage wurde bereits mit "${request?.converted_customer?.company_name || request?.converted_customer?.contact_person}" verknüpft.`
                   : action === 'create'
@@ -517,7 +548,7 @@ export function RequestConversionModal({
                 }
               </p>
 
-              <div className="flex justify-center gap-3">
+              <div className="flex flex-col sm:flex-row justify-center gap-3">
                 <Button
                   variant="outline"
                   onClick={() => onOpenChange(false)}
@@ -542,9 +573,9 @@ export function RequestConversionModal({
                 <AlertTriangle className="w-8 h-8 text-red-500" />
               </div>
               <h3 className="font-semibold text-lg mb-2 text-red-400">Fehler aufgetreten</h3>
-              <p className="text-red-300 mb-6">{error}</p>
+              <p className="text-red-300 mb-6 text-sm sm:text-base text-center px-2 break-words">{error}</p>
 
-              <div className="flex justify-center gap-3">
+              <div className="flex flex-col sm:flex-row justify-center gap-3">
                 <Button
                   variant="outline"
                   onClick={() => onOpenChange(false)}

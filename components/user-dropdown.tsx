@@ -37,6 +37,7 @@ interface UserProfile {
   avatar_url?: string;
   department?: string;
   last_login?: string;
+  user_type?: 'admin' | 'employee' | 'customer' | string;
 }
 
 export default function UserDropdown() {
@@ -64,12 +65,21 @@ export default function UserDropdown() {
         setUser(currentUser);
 
         if (currentUser) {
+          // fetch user profile for accurate role
+          const { data: profile } = await supabase
+            .from('user_profiles')
+            .select('first_name, last_name, user_type')
+            .eq('id', currentUser.id)
+            .maybeSingle();
+
+          const fullName = profile?.first_name || profile?.last_name
+            ? `${profile?.first_name || ''} ${profile?.last_name || ''}`.trim()
+            : (currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || currentUser.email?.split('@')[0] || 'Benutzer');
+
           setUserProfile({
-            full_name: currentUser.user_metadata?.full_name ||
-                      currentUser.user_metadata?.name ||
-                      currentUser.email?.split('@')[0] ||
-                      "Benutzer",
-            role: "Administrator",
+            full_name: fullName,
+            role: (profile?.user_type === 'admin' ? 'Administrator' : profile?.user_type === 'employee' ? 'Mitarbeiter' : 'Benutzer'),
+            user_type: profile?.user_type,
             team: "Development Team",
             department: "IT",
             last_login: new Date().toISOString()
@@ -92,16 +102,24 @@ export default function UserDropdown() {
       setUser(newUser);
 
       if (newUser) {
-        setUserProfile({
-          full_name: newUser.user_metadata?.full_name ||
-                    newUser.user_metadata?.name ||
-                    newUser.email?.split('@')[0] ||
-                    "Benutzer",
-          role: "Administrator",
-          team: "Development Team",
-          department: "IT",
-          last_login: new Date().toISOString()
-        });
+        (async () => {
+          const { data: profile } = await supabase
+            .from('user_profiles')
+            .select('first_name, last_name, user_type')
+            .eq('id', newUser.id)
+            .maybeSingle();
+          const fullName = profile?.first_name || profile?.last_name
+            ? `${profile?.first_name || ''} ${profile?.last_name || ''}`.trim()
+            : (newUser.user_metadata?.full_name || newUser.user_metadata?.name || newUser.email?.split('@')[0] || 'Benutzer');
+          setUserProfile({
+            full_name: fullName,
+            role: (profile?.user_type === 'admin' ? 'Administrator' : profile?.user_type === 'employee' ? 'Mitarbeiter' : 'Benutzer'),
+            user_type: profile?.user_type,
+            team: "Development Team",
+            department: "IT",
+            last_login: new Date().toISOString()
+          });
+        })();
       } else {
         setUserProfile(null);
       }
@@ -222,6 +240,28 @@ export default function UserDropdown() {
             <span>{userProfile.team} • {userProfile.department}</span>
           </div>
         </div>
+
+        <DropdownMenuSeparator className="bg-white/10" />
+
+        {/* Quick Switch */}
+        {userProfile.user_type === 'admin' && (
+          <DropdownMenuItem
+            className="cursor-pointer hover:bg-white/5 focus:bg-white/5"
+            onClick={() => router.push('/workspace')}
+          >
+            <Building2 className="w-4 h-4 mr-3" />
+            Zum Workspace wechseln
+          </DropdownMenuItem>
+        )}
+        {userProfile.user_type === 'admin' && (
+          <DropdownMenuItem
+            className="cursor-pointer hover:bg-white/5 focus:bg-white/5"
+            onClick={() => router.push('/dashboard')}
+          >
+            <Settings className="w-4 h-4 mr-3" />
+            Admin-Dashboard
+          </DropdownMenuItem>
+        )}
 
         <DropdownMenuSeparator className="bg-white/10" />
 

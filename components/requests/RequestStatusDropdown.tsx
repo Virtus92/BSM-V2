@@ -32,13 +32,31 @@ export function RequestStatusDropdown({ requestId, currentStatus }: RequestStatu
 
     setUpdating(true);
     try {
-      const response = await fetch(`/api/contact/${requestId}`, {
+      // Update status
+      const response = await fetch(`/api/requests/${requestId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus })
       });
 
       if (response.ok) {
+        // Auto-assign to current user when status changes to in_progress
+        if (newStatus === 'in_progress') {
+          try {
+            const assignResponse = await fetch(`/api/requests/${requestId}/assign`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ selfAssign: true })
+            });
+
+            if (!assignResponse.ok) {
+              console.warn('Auto-assignment failed, but status was updated');
+            }
+          } catch (assignError) {
+            console.warn('Auto-assignment failed:', assignError);
+          }
+        }
+
         window.location.reload();
       } else {
         alert('Fehler beim Ändern des Status');
@@ -63,12 +81,12 @@ export function RequestStatusDropdown({ requestId, currentStatus }: RequestStatu
           <ChevronDown className="w-4 h-4 ml-2" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-48">
+      <DropdownMenuContent align="end" className="w-48 bg-gray-900 text-white border border-white/10">
         {statusOptions.map((option) => (
           <DropdownMenuItem
             key={option.value}
             onClick={() => handleStatusChange(option.value)}
-            className={`cursor-pointer ${option.value === currentStatus ? 'bg-accent' : ''}`}
+            className={`cursor-pointer focus:bg-white/10 focus:text-white ${option.value === currentStatus ? 'bg-white/10' : ''}`}
           >
             <div className="flex items-center justify-between w-full">
               <span className={option.color}>{option.label}</span>

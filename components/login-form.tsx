@@ -38,8 +38,35 @@ export function LoginForm({
         password,
       });
       if (error) throw error;
-      // Redirect to dashboard after successful login
-      router.push("/dashboard");
+
+      // Get user profile to determine correct redirect
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('user_type, is_active')
+          .eq('id', user.id)
+          .single();
+
+        if (!profile?.is_active) {
+          throw new Error('Account is not active');
+        }
+
+        // Redirect based on user role
+        switch (profile?.user_type) {
+          case 'admin':
+            router.push("/dashboard");
+            break;
+          case 'employee':
+            router.push("/workspace");
+            break;
+          case 'customer':
+            router.push("/portal");
+            break;
+          default:
+            router.push("/portal"); // Default to portal
+        }
+      }
     } catch (error) {
       const message = (error as Error).message || 'An error occurred'
       setError(message)

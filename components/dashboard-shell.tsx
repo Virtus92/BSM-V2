@@ -9,7 +9,7 @@ function DashboardContent({ children }: { children: ReactNode }) {
   const { isOpen } = useSidebar();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900">
       {/* Sidebar */}
       <DashboardSidebar />
 

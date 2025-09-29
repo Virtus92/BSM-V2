@@ -8,7 +8,7 @@ import { ContactRequestWithRelations } from "@/lib/shared-types";
 import { RequestStats } from "@/components/requests/RequestStats";
 import { RequestFilters } from "@/components/requests/RequestFilters";
 import { RequestList } from "@/components/requests/RequestList";
-import { RequestQuickModal } from "@/components/requests/RequestQuickModal";
+import { RequestDetailModal } from "@/components/requests/RequestDetailModal";
 
 export default function RequestsPage() {
   const { toast } = useToast();
@@ -131,16 +131,15 @@ export default function RequestsPage() {
         isConvertible={isConvertible}
         formatDate={formatDate}
         converting={converting}
+        baseHref="/dashboard/requests"
       />
 
-      {/* Request Quick Modal */}
-      <RequestQuickModal
-        request={quickModalRequest}
+      {/* Request Detail Modal */}
+      <RequestDetailModal
         open={!!quickModalRequest}
         onOpenChange={(open) => !open && setQuickModalRequest(null)}
-        onConvertToCustomer={handleConvertToCustomer}
-        isConvertible={isConvertible}
-        converting={converting}
+        requestId={quickModalRequest?.id || null}
+        onUpdated={() => window.location.reload()}
       />
     </div>
   );

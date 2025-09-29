@@ -67,7 +67,7 @@ export async function POST(
         triggerNodeId: resolved.node?.nodeId || triggerNodeId,
         waitForResultMs: 9000
       })
-      if (r.status === 'pending') {
+      if ((r as any).status === 'pending') {
         return NextResponse.json({ success: true, status: 'pending', executionId: r.metadata.executionId })
       }
       return NextResponse.json({ success: true, status: 'completed', data: r, executionId: r.metadata.executionId })

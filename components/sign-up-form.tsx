@@ -40,13 +40,35 @@ export function SignUpForm({
     }
 
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/dashboard`,
+          emailRedirectTo: `${window.location.origin}/portal`,
+          data: {
+            user_type: 'customer'
+          }
         },
       });
+
+      // If user was created successfully, create user profile
+      if (data?.user && !error) {
+        const { error: profileError } = await supabase
+          .from('user_profiles')
+          .insert({
+            id: data.user.id,
+            user_type: 'customer',
+            is_active: true,
+            notifications_enabled: true,
+            language: 'de',
+            timezone: 'Europe/Berlin'
+          });
+
+        if (profileError) {
+          console.error('Failed to create user profile:', profileError);
+          // Don't throw error here as auth was successful
+        }
+      }
       if (error) throw error;
       router.push("/auth/sign-up-success");
     } catch (error) {

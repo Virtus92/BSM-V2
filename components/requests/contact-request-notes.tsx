@@ -28,7 +28,7 @@ export default function ContactRequestNotes({ requestId, initialNotes }: Contact
     if (!content.trim()) return
     setCreating(true)
     try {
-      const res = await fetch(`/api/contact/${requestId}/notes`, {
+      const res = await fetch(`/api/requests/${requestId}/notes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: content.trim(), is_internal: true })
@@ -45,7 +45,7 @@ export default function ContactRequestNotes({ requestId, initialNotes }: Contact
   }
 
   const deleteNote = async (noteId: string) => {
-    const res = await fetch(`/api/contact/notes/${noteId}`, { method: 'DELETE' })
+    const res = await fetch(`/api/requests/notes/${noteId}`, { method: 'DELETE' })
     if (res.ok) {
       setNotes(prev => prev.filter(n => n.id !== noteId))
     }

@@ -17,8 +17,33 @@ export async function GET(request: NextRequest) {
       token_hash,
     });
     if (!error) {
-      // redirect user to specified redirect URL or root of app
-      redirect(next);
+      // Get user profile to determine correct redirect
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('user_type, is_active')
+          .eq('id', user.id)
+          .single();
+
+        if (!profile?.is_active) {
+          redirect('/auth/error?error=Account is not active');
+        }
+
+        // Redirect based on user role
+        switch (profile?.user_type) {
+          case 'admin':
+            redirect('/dashboard');
+          case 'employee':
+            redirect('/workspace');
+          case 'customer':
+            redirect('/portal');
+          default:
+            redirect('/portal'); // Default to portal
+        }
+      } else {
+        redirect(next);
+      }
     } else {
       // redirect the user to an error page with some instructions
       redirect(`/auth/error?error=${error?.message}`);

@@ -272,10 +272,8 @@ export default function AutomationPage() {
               <h2 className="text-xl font-semibold">Digitale Mitarbeiter</h2>
               <DigitalEmployeeList
                 items={employees}
-                executing={executing}
                 onOpen={handleWorkflowOpen}
                 onChat={handleAIChat}
-                onExecute={(w) => handleWorkflowExecute(w)}
               />
             </div>
             <div className="space-y-3">

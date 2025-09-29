@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
+import { CustomerPortalDashboard } from '@/components/portal/CustomerPortalDashboard'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -50,57 +51,82 @@ export default async function PortalPage() {
     redirect('/dashboard')
   }
 
+  if (profile?.user_type === 'employee') {
+    redirect('/workspace')
+  }
+
   // Ensure we have a customer record linked to this user
   await ensureCustomerRecord(user.id, user.email ?? null, user.user_metadata?.full_name ?? null)
 
-  // Load own requests (admin client filters to current user only)
+  // Load customer data with assigned employee
   const admin = createAdminClient()
+  const { data: customer } = await admin
+    .from('customers')
+    .select(`
+      id,
+      company_name,
+      contact_person,
+      email,
+      phone,
+      assigned_employee_id,
+      status,
+      created_at,
+      user_profiles!customers_assigned_employee_id_fkey(
+        id,
+        first_name,
+        last_name,
+        email
+      )
+    `)
+    .eq('user_id', user.id)
+    .single()
+
+  // Load own requests
   const { data: requests } = await admin
     .from('contact_requests')
-    .select('id, created_at, status, subject')
+    .select('id, created_at, status, subject, message, priority')
     .eq('created_by', user.id)
     .order('created_at', { ascending: false })
     .limit(10)
 
+  // Load recent chat messages
+  const { data: recentMessages } = await admin
+    .from('customer_chat_messages')
+    .select(`
+      id,
+      message,
+      created_at,
+      is_from_customer,
+      sender_id,
+      user_profiles!customer_chat_messages_sender_id_fkey(
+        first_name,
+        last_name,
+        email
+      )
+    `)
+    .eq('customer_id', customer?.id || '')
+    .order('created_at', { ascending: false })
+    .limit(5)
+
+  // Get request statistics
+  const requestStats = {
+    total: requests?.length || 0,
+    new: requests?.filter(r => r.status === 'new').length || 0,
+    in_progress: requests?.filter(r => r.status === 'in_progress').length || 0,
+    completed: requests?.filter(r => r.status === 'completed').length || 0
+  }
+
+  if (!customer) {
+    redirect('/customer-setup')
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white">
-      <div className="max-w-4xl mx-auto px-4 py-10">
-        <h1 className="text-2xl font-bold mb-2">Kundenportal</h1>
-        <p className="text-slate-400 mb-8">Erstellen Sie neue Anfragen und verfolgen Sie den Status.</p>
-
-        <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 mb-8">
-          <h2 className="text-lg font-semibold mb-4">Neue Anfrage</h2>
-          <form className="space-y-3" action="/api/portal/requests" method="post">
-            <div>
-              <label className="text-sm text-slate-300">Betreff</label>
-              <input name="subject" required placeholder="Kurzbeschreibung" className="mt-1 w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-white" />
-            </div>
-            <div>
-              <label className="text-sm text-slate-300">Nachricht</label>
-              <textarea name="message" required placeholder="Beschreiben Sie Ihr Anliegen" className="mt-1 w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-white h-28" />
-            </div>
-            <button type="submit" className="inline-flex items-center px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 transition">Anfrage senden</button>
-          </form>
-        </div>
-
-        <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4">
-          <h2 className="text-lg font-semibold mb-4">Ihre letzten Anfragen</h2>
-          <div className="divide-y divide-slate-800">
-            {(requests || []).length === 0 && (
-              <p className="text-slate-400">Noch keine Anfragen erstellt.</p>
-            )}
-            {(requests || []).map((r) => (
-              <div key={r.id as string} className="py-3 flex items-center justify-between">
-                <div>
-                  <p className="font-medium">{r.subject || 'Anfrage'}</p>
-                  <p className="text-sm text-slate-400">{new Date(r.created_at as string).toLocaleString('de-DE')}</p>
-                </div>
-                <span className="text-sm text-slate-300">{r.status}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
+    <CustomerPortalDashboard
+      customer={customer}
+      requests={requests || []}
+      requestStats={requestStats}
+      recentMessages={recentMessages || []}
+      currentUser={user}
+    />
   )
 }

@@ -1,0 +1,491 @@
+'use client';
+
+import { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import {
+  MessageCircle,
+  Send,
+  User,
+  Clock,
+  CheckCircle,
+  AlertCircle,
+  ArrowLeft,
+  Building,
+  Mail,
+  Phone,
+  Calendar,
+  MessageSquare,
+  FileText
+} from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
+import { User as SupabaseUser } from '@supabase/supabase-js';
+
+interface ChatMessage {
+  id: string;
+  message: string;
+  created_at: string;
+  is_from_customer: boolean;
+  sender_id: string;
+  user_profiles?: {
+    first_name: string;
+    last_name: string;
+    email: string;
+  };
+}
+
+interface CustomerRequest {
+  id: string;
+  subject: string;
+  status: string;
+  priority: string;
+  created_at: string;
+  message: string;
+}
+
+interface Customer {
+  id: string;
+  company_name: string;
+  contact_person: string;
+  email: string;
+  phone: string;
+  status: string;
+  assigned_employee_id: string | null;
+  created_at: string;
+  user_profiles?: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+  };
+}
+
+interface UserProfile {
+  user_type: string;
+  first_name: string;
+  last_name: string;
+}
+
+interface EmployeeCustomerChatProps {
+  customer: Customer;
+  chatMessages: ChatMessage[];
+  customerRequests: CustomerRequest[];
+  currentUser: SupabaseUser;
+  userProfile: UserProfile;
+}
+
+export function EmployeeCustomerChat({
+  customer,
+  chatMessages: initialMessages,
+  customerRequests,
+  currentUser,
+  userProfile
+}: EmployeeCustomerChatProps) {
+  const supabase = createClient();
+  const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
+  const [newMessage, setNewMessage] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Auto scroll to bottom
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  // Set up real-time subscription for chat messages
+  useEffect(() => {
+    const channel = supabase
+      .channel('employee_customer_chat')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'customer_chat_messages',
+          filter: `customer_id=eq.${customer.id}`
+        },
+        async (payload) => {
+          // Fetch the complete message with user profile
+          const { data: newMessage } = await supabase
+            .from('customer_chat_messages')
+            .select(`
+              id,
+              message,
+              created_at,
+              is_from_customer,
+              sender_id,
+              user_profiles!customer_chat_messages_sender_id_fkey(
+                first_name,
+                last_name,
+                email
+              )
+            `)
+            .eq('id', payload.new.id)
+            .single();
+
+          if (newMessage) {
+            setMessages(prev => [...prev, newMessage]);
+          }
+        }
+      )
+      .subscribe((status) => {
+        setIsConnected(status === 'SUBSCRIBED');
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [customer.id, supabase]);
+
+  const sendMessage = async () => {
+    if (!newMessage.trim() || loading) return;
+
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('customer_chat_messages')
+        .insert({
+          customer_id: customer.id,
+          message: newMessage.trim(),
+          is_from_customer: false,
+          sender_id: currentUser.id
+        });
+
+      if (error) throw error;
+
+      setNewMessage('');
+    } catch (error) {
+      console.error('Error sending message:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  };
+
+  const formatMessageTime = (timestamp: string) => {
+    return new Date(timestamp).toLocaleString('de-DE', {
+      hour: '2-digit',
+      minute: '2-digit',
+      day: '2-digit',
+      month: '2-digit'
+    });
+  };
+
+  const getInitials = (firstName?: string, lastName?: string) => {
+    if (!firstName && !lastName) return 'U';
+    return `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase();
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'new': return 'bg-blue-500/10 text-blue-500 border-blue-500/20';
+      case 'in_progress': return 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20';
+      case 'completed': return 'bg-green-500/10 text-green-500 border-green-500/20';
+      case 'closed': return 'bg-gray-500/10 text-gray-500 border-gray-500/20';
+      default: return 'bg-gray-500/10 text-gray-500 border-gray-500/20';
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'new': return 'Neu';
+      case 'in_progress': return 'In Bearbeitung';
+      case 'completed': return 'Erledigt';
+      case 'closed': return 'Geschlossen';
+      default: return status;
+    }
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'high': return 'bg-red-500/10 text-red-500 border-red-500/20';
+      case 'medium': return 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20';
+      case 'low': return 'bg-gray-500/10 text-gray-500 border-gray-500/20';
+      default: return 'bg-gray-500/10 text-gray-500 border-gray-500/20';
+    }
+  };
+
+  const assignedEmployee = customer.user_profiles;
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center gap-4">
+        <Link href="/dashboard/customers/chat">
+          <Button variant="ghost" size="sm">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Zurück zur Übersicht
+          </Button>
+        </Link>
+        <div className="flex-1">
+          <h1 className="text-3xl font-bold tracking-tight">
+            Chat mit {customer.company_name}
+          </h1>
+          <p className="text-muted-foreground">
+            Direkte Kommunikation mit Ihrem Kunden
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge variant={isConnected ? "default" : "destructive"} className="text-xs">
+            {isConnected ? '🟢 Online' : '🔴 Offline'}
+          </Badge>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Chat Area */}
+        <div className="lg:col-span-2">
+          <Card className="h-[600px] flex flex-col">
+            <CardHeader className="border-b">
+              <CardTitle className="flex items-center gap-2">
+                <MessageCircle className="w-5 h-5" />
+                Chat-Verlauf
+              </CardTitle>
+              <CardDescription>
+                Echtzeit-Kommunikation mit {customer.contact_person}
+              </CardDescription>
+            </CardHeader>
+
+            {/* Messages Area */}
+            <CardContent className="flex-1 p-4 overflow-y-auto">
+              <div className="space-y-4">
+                {messages.length === 0 ? (
+                  <div className="text-center py-8">
+                    <MessageCircle className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground">
+                      Noch keine Nachrichten. Starten Sie eine Unterhaltung!
+                    </p>
+                  </div>
+                ) : (
+                  messages.map((message) => (
+                    <div
+                      key={message.id}
+                      className={`flex gap-3 ${
+                        message.is_from_customer ? 'justify-start' : 'justify-end'
+                      }`}
+                    >
+                      {message.is_from_customer && (
+                        <Avatar className="w-8 h-8">
+                          <AvatarFallback className="bg-green-600 text-white text-xs">
+                            {getInitials(customer.contact_person?.split(' ')[0], customer.contact_person?.split(' ')[1])}
+                          </AvatarFallback>
+                        </Avatar>
+                      )}
+
+                      <div
+                        className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                          message.is_from_customer
+                            ? 'bg-slate-100 text-slate-900'
+                            : 'bg-blue-600 text-white'
+                        }`}
+                      >
+                        {message.is_from_customer && (
+                          <p className="text-xs text-slate-600 mb-1">
+                            {customer.contact_person}
+                          </p>
+                        )}
+                        <p className="text-sm">{message.message}</p>
+                        <p className={`text-xs mt-1 ${message.is_from_customer ? 'text-slate-500' : 'text-blue-100'}`}>
+                          {formatMessageTime(message.created_at)}
+                        </p>
+                      </div>
+
+                      {!message.is_from_customer && (
+                        <Avatar className="w-8 h-8">
+                          <AvatarFallback className="bg-blue-600 text-white text-xs">
+                            {getInitials(
+                              message.user_profiles?.first_name || userProfile.first_name,
+                              message.user_profiles?.last_name || userProfile.last_name
+                            )}
+                          </AvatarFallback>
+                        </Avatar>
+                      )}
+                    </div>
+                  ))
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+            </CardContent>
+
+            {/* Message Input */}
+            <div className="border-t p-4">
+              <div className="flex gap-2">
+                <Input
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  placeholder="Nachricht eingeben..."
+                  disabled={loading}
+                />
+                <Button
+                  onClick={sendMessage}
+                  disabled={loading || !newMessage.trim()}
+                >
+                  <Send className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        {/* Sidebar */}
+        <div className="space-y-6">
+          {/* Customer Info */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Building className="w-5 h-5" />
+                Kundeninformationen
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center gap-3">
+                <Avatar className="w-12 h-12">
+                  <AvatarFallback className="bg-green-600 text-white">
+                    {getInitials(customer.contact_person?.split(' ')[0], customer.contact_person?.split(' ')[1])}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="font-medium">{customer.company_name}</p>
+                  <p className="text-sm text-muted-foreground">{customer.contact_person}</p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm">
+                  <Mail className="w-4 h-4 text-muted-foreground" />
+                  <span>{customer.email}</span>
+                </div>
+                {customer.phone && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <Phone className="w-4 h-4 text-muted-foreground" />
+                    <span>{customer.phone}</span>
+                  </div>
+                )}
+                <div className="flex items-center gap-2 text-sm">
+                  <Calendar className="w-4 h-4 text-muted-foreground" />
+                  <span>Kunde seit {new Date(customer.created_at).toLocaleDateString('de-DE')}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <User className="w-4 h-4 text-muted-foreground" />
+                  <Badge variant="secondary" className="text-xs">
+                    {customer.status === 'active' ? 'Aktiv' : customer.status}
+                  </Badge>
+                </div>
+              </div>
+
+              {/* Assigned Employee */}
+              <div className="border-t pt-4">
+                <p className="text-sm font-medium mb-2">Zugewiesener Mitarbeiter:</p>
+                {assignedEmployee ? (
+                  <div className="flex items-center gap-2">
+                    <Avatar className="w-6 h-6">
+                      <AvatarFallback className="bg-blue-600 text-white text-xs">
+                        {getInitials(assignedEmployee.first_name, assignedEmployee.last_name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="text-sm">
+                      {assignedEmployee.first_name} {assignedEmployee.last_name}
+                    </span>
+                  </div>
+                ) : (
+                  <Badge variant="outline" className="text-yellow-600 border-yellow-600">
+                    Nicht zugewiesen
+                  </Badge>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Recent Requests */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="w-5 h-5" />
+                Letzte Anfragen
+              </CardTitle>
+              <CardDescription>
+                Aktuelle Kontaktanfragen des Kunden
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {customerRequests.length > 0 ? (
+                <div className="space-y-3">
+                  {customerRequests.slice(0, 3).map((request) => (
+                    <div key={request.id} className="border rounded-lg p-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <h4 className="font-medium text-sm truncate">
+                          {request.subject}
+                        </h4>
+                        <Badge variant="secondary" className={getStatusColor(request.status)}>
+                          {getStatusText(request.status)}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
+                        {request.message}
+                      </p>
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>{new Date(request.created_at).toLocaleDateString('de-DE')}</span>
+                        <Badge variant="secondary" className={getPriorityColor(request.priority)}>
+                          {request.priority}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                  <Link href={`/dashboard/requests?customer=${customer.id}`}>
+                    <Button variant="outline" size="sm" className="w-full">
+                      Alle Anfragen anzeigen
+                    </Button>
+                  </Link>
+                </div>
+              ) : (
+                <div className="text-center py-6">
+                  <MessageSquare className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
+                  <p className="text-sm text-muted-foreground">
+                    Keine Anfragen vorhanden
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Quick Actions */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Schnellaktionen</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <Link href={`/dashboard/customers/${customer.id}`}>
+                <Button variant="outline" className="w-full justify-start">
+                  <User className="w-4 h-4 mr-2" />
+                  Kundenprofil anzeigen
+                </Button>
+              </Link>
+              <Link href={`/dashboard/requests/create?customer=${customer.id}`}>
+                <Button variant="outline" className="w-full justify-start">
+                  <MessageSquare className="w-4 h-4 mr-2" />
+                  Anfrage für Kunde erstellen
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}

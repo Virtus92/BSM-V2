@@ -15,6 +15,8 @@ import {
   Settings,
   Home,
   Menu,
+  MessageSquare,
+  Zap,
 } from "lucide-react";
 
 const SidebarContext = createContext<{
@@ -49,6 +51,18 @@ const sidebarItems = [
     href: "/dashboard/crm",
     icon: Users,
     description: "Kundenverwaltung"
+  },
+  {
+    name: "Anfragen",
+    href: "/dashboard/requests",
+    icon: MessageSquare,
+    description: "Kontaktanfragen"
+  },
+  {
+    name: "Automation",
+    href: "/dashboard/automation",
+    icon: Zap,
+    description: "Automatisierungen & Workflows"
   },
   {
     name: "Projekte",

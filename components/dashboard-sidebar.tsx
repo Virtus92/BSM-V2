@@ -10,9 +10,14 @@ import {
   Home,
   ChevronLeft,
   ChevronRight,
+  Shield,
+  Activity,
+  Settings,
+  UserCheck,
+  Database,
+  Target,
   MessageSquare,
-  Bot,
-  Settings
+  Zap
 } from "lucide-react";
 
 const SidebarContext = createContext<{
@@ -40,7 +45,7 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
 
 const sidebarItems = [
   {
-    name: "Übersicht",
+    name: "Admin Dashboard",
     href: "/dashboard",
     icon: LayoutDashboard
   },
@@ -55,9 +60,29 @@ const sidebarItems = [
     icon: MessageSquare
   },
   {
-    name: "Automation Center",
+    name: "Automation",
     href: "/dashboard/automation",
-    icon: Bot
+    icon: Zap
+  },
+  {
+    name: "User Management",
+    href: "/dashboard/users",
+    icon: Users
+  },
+  {
+    name: "Tasksmanagement",
+    href: "/dashboard/tasks",
+    icon: Target
+  },
+  {
+    name: "System Activity",
+    href: "/dashboard/activity",
+    icon: Shield
+  },
+  {
+    name: "System Settings",
+    href: "/dashboard/settings",
+    icon: Settings
   }
 ];
 
