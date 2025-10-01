@@ -9,7 +9,8 @@ export type UpdateTables<T extends keyof Database['public']['Tables']> = Databas
 
 // Contact Request operations
 export async function getContactRequests() {
-  const supabase = createAdminClient()
+  // Use server client with RLS to enforce visibility
+  const supabase = await createServerClient()
 
   const { data, error } = await supabase
     .from('contact_requests')
@@ -28,8 +29,8 @@ export async function getContactRequests() {
 }
 
 export async function getContactRequestById(id: string) {
-  // Use admin client to bypass RLS for server-side operations
-  const supabase = createAdminClient()
+  // Use server client (RLS-enforced) to prevent leakage across employees
+  const supabase = await createServerClient()
 
   const { data, error } = await supabase
     .from('contact_requests')

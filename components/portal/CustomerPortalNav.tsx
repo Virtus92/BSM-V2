@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { User as SupabaseUser } from '@supabase/supabase-js';
+import { NotificationsBell } from '@/components/notifications/notifications-bell';
 
 interface CustomerPortalNavProps {
   user: SupabaseUser;
@@ -114,6 +115,7 @@ export function CustomerPortalNav({ user, customer }: CustomerPortalNavProps) {
 
             {/* Actions */}
             <div className="flex items-center gap-2">
+              <NotificationsBell />
               <Button
                 variant="ghost"
                 size="sm"

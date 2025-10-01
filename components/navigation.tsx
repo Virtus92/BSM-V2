@@ -2,15 +2,17 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { AuthButtonClient } from "@/components/auth-button-client";
 import { ThemeSwitcher } from "@/components/theme-switcher";
+import { usePublicSettings } from "@/lib/contexts/settings-context";
 import { cn } from "@/lib/utils";
-import { 
-  Menu, 
-  X, 
-  BarChart3, 
+import {
+  Menu,
+  X,
+  BarChart3,
   MessageSquare,
   Home
 } from "lucide-react";
@@ -24,6 +26,7 @@ const navigationItems = [
 export function Navigation() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
+  const { settings: publicSettings } = usePublicSettings();
 
   return (
     <nav className="sticky top-0 z-50 glass-effect border-b border-white/10">
@@ -31,11 +34,24 @@ export function Navigation() {
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-2 group">
-            <div className="w-8 h-8 bg-mystery-gradient rounded-lg flex items-center justify-center mystery-glow">
-              <span className="text-white font-bold text-sm">BSM</span>
-            </div>
+            {publicSettings?.display?.logo_url ? (
+              <div className="w-8 h-8 relative rounded-lg overflow-hidden mystery-glow">
+                <Image
+                  src={publicSettings.display.logo_url}
+                  alt={`${publicSettings?.general?.site_name || 'BSM'} Logo`}
+                  fill
+                  className="object-contain"
+                />
+              </div>
+            ) : (
+              <div className="w-8 h-8 bg-mystery-gradient rounded-lg flex items-center justify-center mystery-glow">
+                <span className="text-white font-bold text-sm">
+                  {publicSettings?.general?.site_name?.slice(0, 3).toUpperCase() || 'BSM'}
+                </span>
+              </div>
+            )}
             <span className="text-xl font-bold text-mystery-gradient">
-              Rising BSM V2
+              {publicSettings?.general?.site_name || 'Rising BSM V2'}
             </span>
           </Link>
 

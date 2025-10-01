@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { usePublicSettings } from "@/lib/contexts/settings-context";
 import { ArrowRight, Sparkles, Shield, Zap, Users, FileText, BarChart3 } from "lucide-react";
 
 export function Hero() {

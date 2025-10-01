@@ -4,7 +4,7 @@
   "description": "Rising BSM V2 - Business Service Management Platform",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "next dev --turbopack -p 3001",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",

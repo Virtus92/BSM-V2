@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { parseAndValidateCustomerCreate } from '@/lib/utils/api-schemas';
 import { logApiError, logAuthError, logDatabaseError } from '@/lib/utils/error-handler';
 import { getUserAccessibleResources } from '@/lib/task-access-control';
+import { logger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -20,83 +21,32 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Check if user is admin for Task-based Access
-    const { data: profile } = await supabase
-      .from('user_profiles')
-      .select('user_type')
-      .eq('id', user.id)
-      .single();
-
-    const isAdmin = profile?.user_type === 'admin';
-
-    // Single-tenant: allow any authenticated user; use admin client for RLS-safe reads
-    const adminClient = createAdminClient();
-
-    // Optional scoping by assignment/ownership
-    const { searchParams } = new URL(request.url);
-    const assignedToParam = searchParams.get('assignedTo');
-    const assignedTo = assignedToParam === 'me' ? user.id : (assignedToParam || null);
-
-    let query = adminClient
+    // Use RLS-enabled query - policies will handle access control
+    // Employees see: unassigned + assigned to them
+    // Admins see: all
+    const { data: customers, error } = await supabase
       .from('customers')
       .select('*')
       .order('updated_at', { ascending: false });
 
-    if (assignedTo) {
-      if (isAdmin) {
-        // Admins see all customers when assignedTo is 'me' but still get their assigned/created customers
-        const accessConditions = [
-          `assigned_employee_id.eq.${assignedTo}`,
-          `created_by.eq.${assignedTo}`
-        ];
-        query = query.or(accessConditions.join(','));
-      } else {
-        // Get customers accessible through task assignments for non-admin users
-        const accessibleResources = await getUserAccessibleResources(assignedTo);
-        const taskAccessibleCustomers = accessibleResources.customerIds;
-
-        // Build OR conditions for access
-        const accessConditions = [
-          `assigned_employee_id.eq.${assignedTo}`,
-          `created_by.eq.${assignedTo}`
-        ];
-
-        // Add task-based access for customers accessible through active tasks
-        if (taskAccessibleCustomers.length > 0) {
-          accessConditions.push(`id.in.(${taskAccessibleCustomers.join(',')})`);
-        }
-
-        query = query.or(accessConditions.join(','));
-      }
-    } else if (isAdmin) {
-      // Admin without specific assignedTo filter gets all customers
-      // No additional filters needed
-    } else {
-      // Non-admin without assignedTo filter should still get task-accessible customers
-      const accessibleResources = await getUserAccessibleResources(user.id);
-      const taskAccessibleCustomers = accessibleResources.customerIds;
-
-      const accessConditions = [
-        `assigned_employee_id.eq.${user.id}`,
-        `created_by.eq.${user.id}`
-      ];
-
-      if (taskAccessibleCustomers.length > 0) {
-        accessConditions.push(`id.in.(${taskAccessibleCustomers.join(',')})`);
-      }
-
-      query = query.or(accessConditions.join(','));
-    }
-
-    const { data: customers, error } = await query;
-
     if (error) {
+      logger.error('Failed to fetch customers', error, {
+        component: 'API',
+        userId: user.id,
+        metadata: { endpoint: '/api/customers', method: 'GET' }
+      });
       logDatabaseError('fetch customers', error, { userId: user.id });
       return NextResponse.json(
-        { error: 'Failed to fetch customers' },
+        { error: 'Failed to fetch customers', details: error.message },
         { status: 500 }
       );
     }
+
+    logger.info('Customers fetched successfully', {
+      component: 'API',
+      userId: user.id,
+      metadata: { count: customers?.length || 0, endpoint: '/api/customers', method: 'GET' }
+    });
 
     return NextResponse.json({
       customers: customers || []

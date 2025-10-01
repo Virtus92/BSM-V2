@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   MessageCircle,
   Send,
@@ -13,7 +14,9 @@ import {
   Clock,
   CheckCircle,
   AlertCircle,
-  Users
+  Users,
+  FileText,
+  CheckSquare
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { User as SupabaseUser } from '@supabase/supabase-js';
@@ -24,7 +27,24 @@ interface ChatMessage {
   created_at: string;
   is_from_customer: boolean;
   sender_id: string;
+  channel_id?: string;
   user_profiles?: {
+    first_name: string;
+    last_name: string;
+    email: string;
+  };
+}
+
+interface ChatChannel {
+  id: string;
+  channel_type: 'permanent' | 'request' | 'task';
+  channel_status: 'active' | 'closed';
+  employee_id: string;
+  source_type?: string;
+  source_id?: string;
+  created_at: string;
+  user_profiles?: {
+    id: string;
     first_name: string;
     last_name: string;
     email: string;
@@ -69,11 +89,115 @@ export function CustomerChatView({
   currentUser
 }: CustomerChatViewProps) {
   const supabase = createClient();
+  const [channels, setChannels] = useState<ChatChannel[]>([]);
+  const [activeChannelId, setActiveChannelId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const [channelsLoading, setChannelsLoading] = useState(true);
   const [isConnected, setIsConnected] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const activeChannel = channels.find(ch => ch.id === activeChannelId);
+
+  // Fetch channels for customer
+  useEffect(() => {
+    const fetchChannels = async () => {
+      setChannelsLoading(true);
+      try {
+        const { data: channelData, error } = await supabase
+          .from('chat_channels')
+          .select(`
+            id,
+            channel_type,
+            channel_status,
+            employee_id,
+            source_type,
+            source_id,
+            created_at
+          `)
+          .eq('customer_id', customer.id)
+          .eq('channel_status', 'active')
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('PortalChat[channels]: Error fetching channels:', error);
+          setChannelsLoading(false);
+          return;
+        }
+
+        console.log('PortalChat[channels]: Found', channelData?.length || 0, 'channels');
+
+        // Fetch employee profiles for all channels
+        if (channelData && channelData.length > 0) {
+          const employeeIds = [...new Set(channelData.map(ch => ch.employee_id))];
+          const { data: profiles } = await supabase
+            .from('user_profiles')
+            .select('id, first_name, last_name, email')
+            .in('id', employeeIds);
+
+          const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+          channelData.forEach((ch: any) => {
+            ch.user_profiles = profileMap.get(ch.employee_id) || null;
+          });
+        }
+
+        setChannels(channelData || []);
+
+        // Auto-select first channel or permanent channel
+        if (channelData && channelData.length > 0) {
+          const permanentChannel = channelData.find(ch => ch.channel_type === 'permanent');
+          const selectedId = permanentChannel?.id || channelData[0].id;
+          console.log('PortalChat[channels]: Auto-selecting channel', selectedId, 'type:', permanentChannel ? 'permanent' : channelData[0].channel_type);
+          setActiveChannelId(selectedId);
+        } else {
+          console.log('PortalChat[channels]: No active channels found for customer');
+        }
+      } catch (error) {
+        console.error('PortalChat[channels]: Error in fetchChannels:', error);
+      } finally {
+        setChannelsLoading(false);
+      }
+    };
+
+    fetchChannels();
+  }, [customer.id, supabase]);
+
+  // Fetch messages for active channel
+  useEffect(() => {
+    if (!activeChannelId) return;
+
+    const fetchMessages = async () => {
+      const { data: msgs, error } = await supabase
+        .from('customer_chat_messages')
+        .select('id, message, created_at, is_from_customer, sender_id, channel_id')
+        .eq('channel_id', activeChannelId)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching messages:', error);
+        return;
+      }
+
+      // Fetch sender profiles
+      if (msgs && msgs.length > 0) {
+        const senderIds = [...new Set(msgs.map(m => m.sender_id))];
+        const { data: profiles } = await supabase
+          .from('user_profiles')
+          .select('id, first_name, last_name')
+          .in('id', senderIds);
+
+        const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+        msgs.forEach((msg: any) => {
+          msg.user_profiles = profileMap.get(msg.sender_id) || null;
+        });
+      }
+
+      setMessages(msgs || []);
+    };
+
+    fetchMessages();
+  }, [activeChannelId, supabase]);
 
   // Auto scroll to bottom
   const scrollToBottom = () => {
@@ -86,51 +210,72 @@ export function CustomerChatView({
 
   // Set up real-time subscription for chat messages
   useEffect(() => {
+    if (!activeChannelId) return;
+
+    console.log('PortalChat[realtime]: Setting up subscription for channel', activeChannelId);
+
     const channel = supabase
-      .channel('customer_chat')
+      .channel(`chat_channel:${activeChannelId}`, {
+        config: {
+          broadcast: { self: true },
+          presence: { key: currentUser.id }
+        }
+      })
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
           table: 'customer_chat_messages',
-          filter: `customer_id=eq.${customer.id}`
+          filter: `channel_id=eq.${activeChannelId}`
         },
         async (payload) => {
-          // Fetch the complete message with user profile
-          const { data: newMessage } = await supabase
+          console.log('PortalChat[realtime]: INSERT event received', {
+            id: (payload?.new as any)?.id,
+            customerId: customer.id,
+            payload: payload.new
+          });
+
+          // Fetch the complete message
+          const { data: newMessage, error: msgError } = await supabase
             .from('customer_chat_messages')
-            .select(`
-              id,
-              message,
-              created_at,
-              is_from_customer,
-              sender_id,
-              user_profiles!customer_chat_messages_sender_id_fkey(
-                first_name,
-                last_name,
-                email
-              )
-            `)
+            .select('id, message, created_at, is_from_customer, sender_id')
             .eq('id', payload.new.id)
             .single();
 
+          if (msgError) {
+            console.error('PortalChat[realtime]: Error fetching message:', msgError);
+            return;
+          }
+
+          // Fetch sender profile
           if (newMessage) {
+            const { data: profile } = await supabase
+              .from('user_profiles')
+              .select('first_name, last_name')
+              .eq('id', newMessage.sender_id)
+              .maybeSingle();
+            (newMessage as any).user_profiles = profile;
+          }
+
+          if (newMessage) {
+            console.log('PortalChat[realtime]: Adding message to UI', newMessage.id);
             setMessages(prev => [...prev, newMessage]);
           }
         }
       )
-      .subscribe((status) => {
+      .subscribe((status, err) => {
+        console.log('PortalChat[realtime]: Subscription status changed:', status, err ? `Error: ${err}` : '');
         setIsConnected(status === 'SUBSCRIBED');
       });
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [customer.id, supabase]);
+  }, [activeChannelId, customer.id, currentUser.id, supabase]);
 
   const sendMessage = async () => {
-    if (!newMessage.trim() || loading) return;
+    if (!newMessage.trim() || loading || !activeChannelId) return;
 
     setLoading(true);
     try {
@@ -138,14 +283,26 @@ export function CustomerChatView({
         .from('customer_chat_messages')
         .insert({
           customer_id: customer.id,
+          channel_id: activeChannelId,
           message: newMessage.trim(),
           is_from_customer: true,
           sender_id: currentUser.id
         });
 
       if (error) throw error;
+      console.log('PortalChat[send]: inserted message for customer=', customer.id);
 
       setNewMessage('');
+
+      // Fire notification to assigned employee (server will route)
+      try {
+        const res = await fetch('/api/notifications/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ customerId: customer.id, isFromCustomer: true })
+        });
+        console.log('PortalChat[notify]: POST /api/notifications/chat status=', res.status);
+      } catch (_) {}
     } catch (error) {
       console.error('Error sending message:', error);
     } finally {
@@ -175,6 +332,23 @@ export function CustomerChatView({
   };
 
   const assignedEmployee = customer.user_profiles;
+  const hasAssignedEmployee = !!customer.assigned_employee_id;
+
+  const getChannelIcon = (type: string) => {
+    switch (type) {
+      case 'permanent': return <User className="w-4 h-4" />;
+      case 'request': return <FileText className="w-4 h-4" />;
+      case 'task': return <CheckSquare className="w-4 h-4" />;
+      default: return <MessageCircle className="w-4 h-4" />;
+    }
+  };
+
+  const getChannelLabel = (channel: ChatChannel) => {
+    if (channel.channel_type === 'permanent') {
+      return 'Hauptkanal';
+    }
+    return `${channel.source_type === 'contact_request' ? 'Anfrage' : 'Aufgabe'}`;
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white">
@@ -184,7 +358,10 @@ export function CustomerChatView({
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Chat & Support</h1>
             <p className="text-slate-400">
-              Direkter Kontakt zu Ihrem zugewiesenen Mitarbeiter
+              {channels.length > 0
+                ? `${channels.length} aktive Kommunikationskanäle`
+                : 'Direkter Kontakt zu Ihrem zugewiesenen Mitarbeiter'
+              }
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -202,10 +379,29 @@ export function CustomerChatView({
                 <CardTitle className="flex items-center gap-2">
                   <MessageCircle className="w-5 h-5" />
                   Chat-Verlauf
+                  {activeChannel && (
+                    <Badge variant="outline" className="ml-auto">
+                      {getChannelIcon(activeChannel.channel_type)}
+                      <span className="ml-1">{getChannelLabel(activeChannel)}</span>
+                    </Badge>
+                  )}
                 </CardTitle>
-                <CardDescription className="text-slate-400">
-                  Kommunikation mit Ihrem zugewiesenen Mitarbeiter
-                </CardDescription>
+                {channels.length > 1 && (
+                  <Tabs value={activeChannelId || ''} onValueChange={setActiveChannelId} className="mt-2">
+                    <TabsList className="bg-slate-800">
+                      {channels.map(channel => (
+                        <TabsTrigger
+                          key={channel.id}
+                          value={channel.id}
+                          className="flex items-center gap-2"
+                        >
+                          {getChannelIcon(channel.channel_type)}
+                          <span>{getChannelLabel(channel)}</span>
+                        </TabsTrigger>
+                      ))}
+                    </TabsList>
+                  </Tabs>
+                )}
               </CardHeader>
 
               {/* Messages Area */}
@@ -276,21 +472,32 @@ export function CustomerChatView({
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
                     onKeyPress={handleKeyPress}
-                    placeholder="Nachricht eingeben..."
+                    placeholder={
+                      !activeChannelId
+                        ? 'Kein aktiver Kanal...'
+                        : !hasAssignedEmployee
+                        ? 'Noch kein Mitarbeiter zugewiesen...'
+                        : 'Nachricht eingeben...'
+                    }
                     className="bg-slate-800 border-slate-700 text-white"
-                    disabled={loading || !assignedEmployee}
+                    disabled={loading || !activeChannelId || !hasAssignedEmployee}
                   />
                   <Button
                     onClick={sendMessage}
-                    disabled={loading || !newMessage.trim() || !assignedEmployee}
+                    disabled={loading || !newMessage.trim() || !activeChannelId || !hasAssignedEmployee}
                     className="bg-blue-600 hover:bg-blue-500"
                   >
                     <Send className="w-4 h-4" />
                   </Button>
                 </div>
-                {!assignedEmployee && (
+                {!hasAssignedEmployee && (
                   <p className="text-xs text-yellow-400 mt-2">
                     Noch kein Mitarbeiter zugewiesen. Sie werden benachrichtigt, sobald jemand verfügbar ist.
+                  </p>
+                )}
+                {!activeChannelId && channels.length === 0 && (
+                  <p className="text-xs text-slate-400 mt-2">
+                    Warten auf Kanalzuweisung...
                   </p>
                 )}
               </div>
@@ -320,9 +527,11 @@ export function CustomerChatView({
                         <p className="font-medium text-white">
                           {assignedEmployee.first_name} {assignedEmployee.last_name}
                         </p>
-                        <p className="text-sm text-slate-400">
-                          {assignedEmployee.email}
-                        </p>
+                        {assignedEmployee.email && (
+                          <p className="text-sm text-slate-400">
+                            {assignedEmployee.email}
+                          </p>
+                        )}
                       </div>
                     </div>
 
@@ -335,6 +544,16 @@ export function CustomerChatView({
                         <Clock className="w-4 h-4 text-blue-400" />
                         <span className="text-sm text-slate-300">Verfügbar für Chat</span>
                       </div>
+                    </div>
+                  </div>
+                ) : hasAssignedEmployee ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4 text-green-400" />
+                      <span className="text-sm text-slate-300">Zugewiesen</span>
+                    </div>
+                    <div className="text-sm text-slate-400">
+                      Ansprechpartner-Details sind derzeit nicht verfügbar.
                     </div>
                   </div>
                 ) : (

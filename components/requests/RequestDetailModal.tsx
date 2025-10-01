@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -40,6 +41,7 @@ interface RequestDetailModalProps {
 }
 
 export function RequestDetailModal({ open, onOpenChange, requestId, onUpdated, canAssign = true }: RequestDetailModalProps) {
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [request, setRequest] = useState<any | null>(null);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
@@ -214,7 +216,16 @@ export function RequestDetailModal({ open, onOpenChange, requestId, onUpdated, c
   };
 
   const handleConvert = () => setShowConversionModal(true);
-  const handleConversionSuccess = () => { setShowConversionModal(false); onUpdated?.(); onOpenChange(false); };
+  const handleConversionSuccess = (customerId: string, action: 'created' | 'linked') => {
+    setShowConversionModal(false);
+    onUpdated?.();
+    onOpenChange(false);
+    // Navigate to the customer page
+    if (customerId) {
+      const basePath = window.location.pathname.startsWith('/workspace') ? '/workspace' : '/dashboard';
+      router.push(`${basePath}/customers/${customerId}`);
+    }
+  };
 
   if (!open) return null;
 
@@ -299,7 +310,7 @@ export function RequestDetailModal({ open, onOpenChange, requestId, onUpdated, c
                     </Button>
                   )}
                   {(() => { const cid = request?.converted_customer?.id || request?.converted_to_customer_id; return cid ? (
-                    <Button className="mystery-button w-full sm:w-auto" onClick={() => window.location.assign(`/dashboard/crm/${cid}`)}>
+                    <Button className="mystery-button w-full sm:w-auto" onClick={() => window.location.assign(`/dashboard/customers/${cid}`)}>
                       Kunde öffnen
                     </Button>
                   ) : (

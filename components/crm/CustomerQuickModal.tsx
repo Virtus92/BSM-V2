@@ -39,30 +39,12 @@ export function CustomerQuickModal({ customer, open, onOpenChange, onEdit }: Cus
   if (!customer) return null;
 
   const handleOpenDetail = () => {
-    router.push(`/dashboard/crm/${customer.id}`);
+    router.push(`/dashboard/customers/${customer.id}`);
     onOpenChange(false);
   };
 
-  const handleEmail = () => {
-    if (customer.email) {
-      window.location.href = `mailto:${customer.email}`;
-    }
-  };
-
-  const handleCall = () => {
-    if (customer.phone) {
-      window.location.href = `tel:${customer.phone}`;
-    }
-  };
-
-  const handleWebsite = () => {
-    if (customer.website) {
-      const url = customer.website.startsWith('http')
-        ? customer.website
-        : `https://${customer.website}`;
-      window.location.href = url;
-    }
-  };
+  // These actions use native browser link behavior (mailto:, tel:, http:)
+  // No router navigation needed for external protocols
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -167,33 +149,39 @@ export function CustomerQuickModal({ customer, open, onOpenChange, onEdit }: Cus
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleEmail}
+                  asChild
                   className="flex items-center gap-2 h-12 hover:bg-blue-500/10 hover:border-blue-500/20"
                 >
-                  <Mail className="w-4 h-4" />
-                  E-Mail
+                  <a href={`mailto:${customer.email}`}>
+                    <Mail className="w-4 h-4" />
+                    E-Mail
+                  </a>
                 </Button>
               )}
               {customer.phone && (
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleCall}
+                  asChild
                   className="flex items-center gap-2 h-12 hover:bg-green-500/10 hover:border-green-500/20"
                 >
-                  <PhoneCall className="w-4 h-4" />
-                  Anrufen
+                  <a href={`tel:${customer.phone}`}>
+                    <PhoneCall className="w-4 h-4" />
+                    Anrufen
+                  </a>
                 </Button>
               )}
               {customer.website && (
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleWebsite}
+                  asChild
                   className="flex items-center gap-2 h-12 hover:bg-purple-500/10 hover:border-purple-500/20"
                 >
-                  <Globe className="w-4 h-4" />
-                  Website
+                  <a href={customer.website.startsWith('http') ? customer.website : `https://${customer.website}`} target="_blank" rel="noopener noreferrer">
+                    <Globe className="w-4 h-4" />
+                    Website
+                  </a>
                 </Button>
               )}
               <Button

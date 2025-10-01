@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useToast } from '@/components/ui/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -85,6 +87,8 @@ export function EmployeeChatManagement({
   userProfile,
   availableEmployees
 }: EmployeeChatManagementProps) {
+  const router = useRouter();
+  const { toast } = useToast();
   const supabase = createClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedEmployee, setSelectedEmployee] = useState<string>('all');
@@ -122,11 +126,21 @@ export function EmployeeChatManagement({
         .update({ assigned_employee_id: employeeId })
         .eq('id', customerId);
 
-      if (!error) {
-        window.location.reload();
+      if (error) {
+        throw error;
       }
+
+      toast({
+        title: 'Erfolg',
+        description: 'Mitarbeiter wurde erfolgreich zugewiesen'
+      });
+      router.refresh();
     } catch (error) {
-      console.error('Error assigning employee:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Fehler',
+        description: error instanceof Error ? error.message : 'Fehler beim Zuweisen'
+      });
     }
   };
 
@@ -485,13 +499,13 @@ function CustomerList({
 
               {/* Actions */}
               <div className="flex gap-2 pt-2">
-                <Link href={`/dashboard/customers/chat/${customer.id}`} className="flex-1">
+                <Link href={`/workspace/customers/chat/${customer.id}`} className="flex-1">
                   <Button variant="outline" className="w-full">
                     <MessageCircle className="w-4 h-4 mr-2" />
                     Chat öffnen
                   </Button>
                 </Link>
-                <Link href={`/dashboard/customers/${customer.id}`}>
+                <Link href={`/workspace/customers/${customer.id}`}>
                   <Button variant="ghost" size="sm">
                     <User className="w-4 h-4" />
                   </Button>

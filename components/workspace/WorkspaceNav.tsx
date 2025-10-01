@@ -71,11 +71,6 @@ export function WorkspaceNav({ user, profile }: WorkspaceNavProps) {
       icon: MessageCircle
     },
     {
-      name: 'Aktivität',
-      href: '/workspace/activity',
-      icon: Activity
-    },
-    {
       name: 'Workflows',
       href: '/workspace/automation',
       icon: Calendar

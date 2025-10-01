@@ -45,7 +45,6 @@ export function WorkspaceSidebar() {
     { name: 'Kunden', href: '/workspace/customers', icon: Users },
     { name: 'Anfragen', href: '/workspace/requests', icon: MessageSquare },
     { name: 'Aufgaben', href: '/workspace/tasks', icon: ClipboardList },
-    { name: 'Aktivität', href: '/workspace/activity', icon: Activity },
     { name: 'Automation', href: '/workspace/automation', icon: Bot },
     { name: 'Chat', href: '/workspace/customers/chat', icon: MessageCircle },
   ];

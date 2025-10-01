@@ -337,7 +337,7 @@ export function TaskDetailView({
                         <div className="text-sm text-muted-foreground">{task.customers.contact_person}</div>
                       </div>
                     </div>
-                    <Link href={`/dashboard/crm/${task.customers.id}`}>
+                    <Link href={`/dashboard/customers/${task.customers.id}`}>
                       <Button variant="ghost" size="sm">
                         <ExternalLink className="w-4 h-4" />
                       </Button>

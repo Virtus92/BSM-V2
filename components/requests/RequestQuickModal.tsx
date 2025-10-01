@@ -2,6 +2,7 @@
 
 import { Button } from '@/components/ui/button';
 import { ContactRequestStatusBadge, PriorityBadge } from '@/components/ui/status-badge';
+import { useRouter } from 'next/navigation';
 import {
   Dialog,
   DialogContent,
@@ -24,7 +25,6 @@ import {
 } from 'lucide-react';
 import { ContactRequestWithRelations, ContactRequestStatus, PriorityLevel } from '@/lib/shared-types';
 import { formatDate } from '@/lib/utils/formatters';
-import { useRouter } from 'next/navigation';
 import { RequestConversionModal } from './RequestConversionModal';
 import { useState } from 'react';
 
@@ -48,10 +48,11 @@ export function RequestQuickModal({
   const router = useRouter();
   const [showConversionModal, setShowConversionModal] = useState(false);
 
-  const handleConversionSuccess = () => {
-    // Refresh the parent component by calling the original conversion handler
-    if (request) {
-      onConvertToCustomer(request.id);
+  const handleConversionSuccess = (customerId: string, action: 'created' | 'linked') => {
+    // Navigate to the customer page
+    if (customerId) {
+      const basePath = window.location.pathname.startsWith('/workspace') ? '/workspace' : '/dashboard';
+      router.push(`${basePath}/customers/${customerId}`);
     }
     setShowConversionModal(false);
   };
@@ -59,21 +60,13 @@ export function RequestQuickModal({
   if (!request) return null;
 
   const handleOpenDetail = () => {
-    router.push(`/dashboard/requests/${request.id}`);
+    const basePath = window.location.pathname.startsWith('/workspace') ? '/workspace' : '/dashboard';
+    router.push(`${basePath}/requests/${request.id}`);
     onOpenChange(false);
   };
 
-  const handleEmail = () => {
-    if (request.email) {
-      window.location.href = `mailto:${request.email}`;
-    }
-  };
-
-  const handleCall = () => {
-    if (request.phone) {
-      window.location.href = `tel:${request.phone}`;
-    }
-  };
+  // These actions use native browser link behavior (mailto:, tel:)
+  // No router navigation needed for external protocols
 
   const handleConvert = () => {
     setShowConversionModal(true);
@@ -201,21 +194,25 @@ export function RequestQuickModal({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={handleEmail}
+                asChild
                 className="flex items-center gap-2 h-12 hover:bg-blue-500/10 hover:border-blue-500/20"
               >
-                <Mail className="w-4 h-4" />
-                E-Mail
+                <a href={`mailto:${request.email}`}>
+                  <Mail className="w-4 h-4" />
+                  E-Mail
+                </a>
               </Button>
               {request.phone && (
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleCall}
+                  asChild
                   className="flex items-center gap-2 h-12 hover:bg-green-500/10 hover:border-green-500/20"
                 >
-                  <PhoneCall className="w-4 h-4" />
-                  Anrufen
+                  <a href={`tel:${request.phone}`}>
+                    <PhoneCall className="w-4 h-4" />
+                    Anrufen
+                  </a>
                 </Button>
               )}
               {isConvertible(request) ? (
@@ -234,7 +231,8 @@ export function RequestQuickModal({
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    router.push(`/dashboard/crm/${request.converted_customer?.id}`);
+                    const basePath = window.location.pathname.startsWith('/workspace') ? '/workspace' : '/dashboard';
+                    router.push(`${basePath}/customers/${request.converted_customer?.id}`);
                     onOpenChange(false);
                   }}
                   className="flex items-center gap-2 h-12 hover:bg-green-500/10 hover:border-green-500/20"
@@ -275,7 +273,8 @@ export function RequestQuickModal({
                 </Button>
                 <Button
                   onClick={() => {
-                    router.push(`/dashboard/crm/${request.converted_customer?.id}`);
+                    const basePath = window.location.pathname.startsWith('/workspace') ? '/workspace' : '/dashboard';
+                    router.push(`${basePath}/customers/${request.converted_customer?.id}`);
                     onOpenChange(false);
                   }}
                   className="mystery-button flex items-center gap-2"

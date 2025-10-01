@@ -1,0 +1,3 @@
+-- This migration is superseded by 20250930000007_fix_profile_policy_recursion.sql
+-- This file is kept for migration history tracking only
+-- No changes needed

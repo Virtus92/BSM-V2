@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useToast } from '@/components/ui/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -91,12 +93,21 @@ export function CustomerPortalDashboard({
     message: ''
   });
   const [submitLoading, setSubmitLoading] = useState(false);
+  const router = useRouter();
+  const { toast } = useToast();
 
   const assignedEmployee = customer.user_profiles;
 
   const handleSubmitRequest = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newRequestForm.subject.trim() || !newRequestForm.message.trim()) return;
+    if (!newRequestForm.subject.trim() || !newRequestForm.message.trim()) {
+      toast({
+        variant: 'destructive',
+        title: 'Validierungsfehler',
+        description: 'Bitte füllen Sie alle Felder aus.'
+      });
+      return;
+    }
 
     setSubmitLoading(true);
     try {
@@ -108,12 +119,25 @@ export function CustomerPortalDashboard({
         body: JSON.stringify(newRequestForm)
       });
 
-      if (response.ok) {
-        setNewRequestForm({ subject: '', message: '' });
-        window.location.reload(); // Refresh to show new request
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Anfrage konnte nicht erstellt werden');
       }
+
+      setNewRequestForm({ subject: '', message: '' });
+      toast({
+        title: 'Anfrage erstellt',
+        description: 'Ihre Anfrage wurde erfolgreich übermittelt.'
+      });
+
+      // Refresh server data without full page reload
+      router.refresh();
     } catch (error) {
-      console.error('Error submitting request:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Fehler',
+        description: error instanceof Error ? error.message : 'Ein Fehler ist aufgetreten'
+      });
     } finally {
       setSubmitLoading(false);
     }

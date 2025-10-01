@@ -78,7 +78,11 @@ export async function POST(request: NextRequest) {
         email: form.get('email')?.toString().trim(),
         company_name: form.get('company_name')?.toString().trim(),
         phone: form.get('phone')?.toString().trim(),
-        address: form.get('address')?.toString().trim()
+        address_line1: form.get('address_line1')?.toString().trim(),
+        address_line2: form.get('address_line2')?.toString().trim(),
+        city: form.get('city')?.toString().trim(),
+        postal_code: form.get('postal_code')?.toString().trim(),
+        country: form.get('country')?.toString().trim()
       };
     }
 
@@ -115,7 +119,14 @@ export async function POST(request: NextRequest) {
         // Update existing customer
         await admin
           .from('customers')
-          .update(customerUpdate)
+          .update({
+            ...customerUpdate,
+            address_line1: updateData.address_line1 ?? customerUpdate.address_line1,
+            address_line2: updateData.address_line2 ?? customerUpdate.address_line2,
+            city: updateData.city ?? customerUpdate.city,
+            postal_code: updateData.postal_code ?? customerUpdate.postal_code,
+            country: updateData.country ?? customerUpdate.country,
+          })
           .eq('user_id', user.id);
       } else {
         // Create new customer record
@@ -125,7 +136,12 @@ export async function POST(request: NextRequest) {
             ...customerUpdate,
             user_id: user.id,
             contact_person: `${updateData.first_name || ''} ${updateData.last_name || ''}`.trim(),
-            status: 'active'
+            status: 'active',
+            address_line1: updateData.address_line1 || null,
+            address_line2: updateData.address_line2 || null,
+            city: updateData.city || null,
+            postal_code: updateData.postal_code || null,
+            country: updateData.country || null
           });
       }
     }

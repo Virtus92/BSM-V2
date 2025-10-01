@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useToast } from '@/components/ui/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -129,6 +131,8 @@ export function SimpleUserDetailView({
   assignedRequests = [],
   activityLogs = []
 }: SimpleUserDetailViewProps) {
+  const router = useRouter();
+  const { toast } = useToast();
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [showRequestModal, setShowRequestModal] = useState(false);
@@ -147,7 +151,7 @@ export function SimpleUserDetailView({
     employeeId: user.id
   });
 
-  const roleInfo = getUserRoleInfo(user.profile?.user_type);
+  const roleInfo = getUserRoleInfo(user.profile?.user_type || user.user_type);
   const statusInfo = getUserStatusInfo(user);
   const displayName = getUserDisplayName(user);
 
@@ -175,20 +179,34 @@ export function SimpleUserDetailView({
         }),
       });
 
-      if (response.ok) {
-        setShowTaskModal(false);
-        setTaskData({ title: '', description: '', priority: 'medium', due_date: '' });
-        window.location.reload();
+      if (!response.ok) {
+        throw new Error('Fehler beim Erstellen der Aufgabe');
       }
+
+      toast({
+        title: 'Erfolg',
+        description: 'Aufgabe wurde erfolgreich erstellt'
+      });
+      setShowTaskModal(false);
+      setTaskData({ title: '', description: '', priority: 'medium', due_date: '' });
+      router.refresh();
     } catch (error) {
-      console.error('Error creating task:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Fehler',
+        description: error instanceof Error ? error.message : 'Fehler beim Erstellen'
+      });
     }
   };
 
   const assignCustomer = async () => {
     try {
       if (!['employee', 'admin'].includes(user.profile?.user_type || '')) {
-        alert('Nur aktive Mitarbeiter oder Admins können Kunden zugewiesen bekommen.');
+        toast({
+          variant: 'destructive',
+          title: 'Fehler',
+          description: 'Nur aktive Mitarbeiter oder Admins können Kunden zugewiesen bekommen'
+        });
         return;
       }
       const response = await fetch(`/api/customers/${customerAssignment.customerId}/assign`, {
@@ -197,19 +215,33 @@ export function SimpleUserDetailView({
         body: JSON.stringify({ employeeId: user.id }),
       });
 
-      if (response.ok) {
-        setShowCustomerModal(false);
-        window.location.reload();
+      if (!response.ok) {
+        throw new Error('Fehler beim Zuweisen');
       }
+
+      toast({
+        title: 'Erfolg',
+        description: 'Kunde wurde erfolgreich zugewiesen'
+      });
+      setShowCustomerModal(false);
+      router.refresh();
     } catch (error) {
-      console.error('Error assigning customer:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Fehler',
+        description: error instanceof Error ? error.message : 'Fehler beim Zuweisen'
+      });
     }
   };
 
   const assignRequest = async () => {
     try {
       if (!['employee', 'admin'].includes(user.profile?.user_type || '')) {
-        alert('Nur aktive Mitarbeiter oder Admins können Anfragen zugewiesen bekommen.');
+        toast({
+          variant: 'destructive',
+          title: 'Fehler',
+          description: 'Nur aktive Mitarbeiter oder Admins können Anfragen zugewiesen bekommen'
+        });
         return;
       }
       const response = await fetch(`/api/requests/${requestAssignment.requestId}/assign`, {
@@ -218,12 +250,22 @@ export function SimpleUserDetailView({
         body: JSON.stringify({ employeeId: user.id }),
       });
 
-      if (response.ok) {
-        setShowRequestModal(false);
-        window.location.reload();
+      if (!response.ok) {
+        throw new Error('Fehler beim Zuweisen');
       }
+
+      toast({
+        title: 'Erfolg',
+        description: 'Anfrage wurde erfolgreich zugewiesen'
+      });
+      setShowRequestModal(false);
+      router.refresh();
     } catch (error) {
-      console.error('Error assigning request:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Fehler',
+        description: error instanceof Error ? error.message : 'Fehler beim Zuweisen'
+      });
     }
   };
 

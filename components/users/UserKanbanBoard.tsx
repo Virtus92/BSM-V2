@@ -153,19 +153,29 @@ export function UserKanbanBoard({ isWorkspace = false }: UserKanbanBoardProps) {
 
   const getUsersByColumn = (columnRoles: string[]) => {
     if (columnRoles.includes('inactive')) {
+      // Handle both nested profile structure and flat structure
+      const isActive = (user: any) => user.profile?.is_active ?? user.is_active;
       return users.filter(user =>
-        !user.email_confirmed_at || user.profile?.is_active === false
+        isActive(user) === false ||
+        (user.email_confirmed_at !== undefined && !user.email_confirmed_at)
       );
     }
-    return users.filter(user =>
-      columnRoles.includes(user.profile?.user_type || '') &&
-      user.email_confirmed_at &&
-      user.profile?.is_active !== false
-    );
+    return users.filter(user => {
+      // Handle both nested profile structure and flat structure
+      const userType = user.profile?.user_type || user.user_type;
+      const isActive = user.profile?.is_active ?? user.is_active;
+
+      return columnRoles.includes(userType || '') &&
+             isActive !== false &&
+             (user.email_confirmed_at === undefined || user.email_confirmed_at);
+    });
   };
 
   const getStatusActions = (user: User) => {
-    const isInactive = !user.email_confirmed_at || user.profile?.is_active === false;
+    // Handle both nested profile structure and flat structure
+    const isActive = user.profile?.is_active ?? user.is_active;
+    const isInactive = (user.email_confirmed_at !== undefined && !user.email_confirmed_at) ||
+                      isActive === false;
 
     if (isInactive) {
       return (
@@ -266,7 +276,7 @@ export function UserKanbanBoard({ isWorkspace = false }: UserKanbanBoardProps) {
               </CardHeader>
               <CardContent className="space-y-3 max-h-[calc(100vh-300px)] overflow-y-auto">
                 {columnUsers.map((user) => {
-                  const roleInfo = getUserRoleInfo(user.profile?.user_type);
+                  const roleInfo = getUserRoleInfo(user.profile?.user_type || user.user_type);
                   const statusInfo = getUserStatusInfo(user);
                   const displayName = getUserDisplayName(user);
                   const RoleIcon = roleInfo.icon;

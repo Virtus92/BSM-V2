@@ -134,7 +134,7 @@ export function RequestConversionModal({
     if (open && request) {
       if (isAlreadyConverted && convertedCustomerId) {
         // Request is already converted, close modal and redirect to customer
-        router.push(`/dashboard/crm/${convertedCustomerId}`);
+        router.push(`/dashboard/customers/${convertedCustomerId}`);
         onOpenChange(false);
         return;
       } else if (step === 'checking') {
@@ -149,57 +149,29 @@ export function RequestConversionModal({
     setStep('processing');
 
     try {
-      // Create new customer
-      const { data: customer, error: customerError } = await supabase
-        .from('customers')
-        .insert({
-          company_name: formData.company_name || formData.contact_person,
-          contact_person: formData.contact_person,
-          email: formData.email,
-          phone: formData.phone || null,
-          // notes will be created separately in customer_notes table
-          status: 'active'
+      // Create new customer via API to avoid RLS issues
+      const createResponse = await fetch(`/api/contact/${request.id}/convert`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: formData.contact_person,
+          company: formData.company_name || formData.contact_person,
+          phone: formData.phone,
+          status: 'active',
+          notes: formData.notes
         })
-        .select()
-        .single();
+      });
 
-      if (customerError) {
-        console.error('Error creating customer:', customerError);
-        setError(`Fehler beim Erstellen des Kunden: ${customerError.message}`);
+      if (!createResponse.ok) {
+        const err = await createResponse.json().catch(() => ({}));
+        console.error('Error creating customer:', err);
+        setError(`Fehler beim Erstellen des Kunden: ${err.error || 'Unbekannter Fehler'}`);
         setStep('error');
         return;
       }
 
-      // Create customer note if notes exist
-      if (formData.notes) {
-        await supabase
-          .from('customer_notes')
-          .insert({
-            customer_id: customer.id,
-            title: 'Konvertierung aus Kontaktanfrage',
-            content: formData.notes,
-            note_type: 'general',
-            is_internal: false,
-            created_by: (await supabase.auth.getUser()).data.user?.id
-          });
-      }
-
-      // Update request with customer reference
-      const { error: requestError } = await supabase
-        .from('contact_requests')
-        .update({
-          converted_to_customer_id: customer.id,
-          status: 'converted',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', request.id);
-
-      if (requestError) {
-        console.error('Error updating request:', requestError);
-        setError(`Fehler beim Aktualisieren der Anfrage: ${requestError.message}`);
-        setStep('error');
-        return;
-      }
+      const createData = await createResponse.json();
+      const customer = createData.customer;
 
       // Auto-assign to current user when converting
       try {
@@ -282,7 +254,7 @@ export function RequestConversionModal({
   const handleViewCustomer = () => {
     const customerId = selectedCustomer?.id || createdCustomerId || convertedCustomerId;
     if (customerId) {
-      router.push(`/dashboard/crm/${customerId}`);
+      router.push(`/dashboard/customers/${customerId}`);
       onOpenChange(false);
     }
   };

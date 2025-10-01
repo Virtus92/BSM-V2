@@ -143,9 +143,14 @@ export const STATUS_THEMES = {
 } as const;
 
 // Shared utility functions
-export const getUserDisplayName = (user: CompleteUserData): string => {
+export const getUserDisplayName = (user: CompleteUserData | any): string => {
+  // Handle nested profile structure
   if (user.profile?.first_name || user.profile?.last_name) {
     return `${user.profile.first_name || ''} ${user.profile.last_name || ''}`.trim();
+  }
+  // Handle flat structure (API response)
+  if (user.first_name || user.last_name) {
+    return `${user.first_name || ''} ${user.last_name || ''}`.trim();
   }
   if (user.customer?.contact_person) {
     return user.customer.contact_person;
@@ -158,11 +163,19 @@ export const getUserRoleInfo = (userType?: string) => {
   return ROLE_THEMES[type] || ROLE_THEMES.unknown;
 };
 
-export const getUserStatusInfo = (user: CompleteUserData) => {
-  if (!user.email_confirmed_at) {
-    return STATUS_THEMES.pending;
+export const getUserStatusInfo = (user: CompleteUserData | any) => {
+  // Handle both nested profile structure and flat structure
+  const isActive = user.profile?.is_active ?? user.is_active;
+
+  // If we have email_confirmed_at info, use it
+  if (user.email_confirmed_at !== undefined) {
+    if (!user.email_confirmed_at) {
+      return STATUS_THEMES.pending;
+    }
   }
-  if (user.profile?.is_active === false) {
+
+  // Otherwise just use is_active status
+  if (isActive === false) {
     return STATUS_THEMES.inactive;
   }
   return STATUS_THEMES.active;

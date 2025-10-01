@@ -13,7 +13,6 @@ import {
   TrendingUp,
   Calendar,
   FileText,
-  Activity,
   Settings,
   Plus,
   Search,
@@ -334,13 +333,6 @@ export function AdminDashboardView({ data }: AdminDashboardViewProps) {
                       </div>
                     );
                   })}
-                </div>
-                <div className="mt-4 pt-4 border-t border-border">
-                  <Link href="/dashboard/activity">
-                    <Button variant="outline" className="w-full">
-                      Alle Aktivitäten anzeigen
-                    </Button>
-                  </Link>
                 </div>
               </CardContent>
             </Card>

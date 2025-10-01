@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -22,6 +24,8 @@ interface CustomerDetailModalProps {
 }
 
 export function CustomerDetailModal({ open, onOpenChange, customerId, onUpdated, canAssign = true }: CustomerDetailModalProps) {
+  const router = useRouter();
+  const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [customer, setCustomer] = useState<any | null>(null);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
@@ -78,12 +82,23 @@ export function CustomerDetailModal({ open, onOpenChange, customerId, onUpdated,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ employeeId: assignTarget })
       });
-      if (res.ok) {
-        const detail = await (await fetch(`/api/customers/${customer.id}`)).json();
-        setCustomer(detail.customer);
-        setAssignTarget('');
-        onUpdated?.();
+      if (!res.ok) {
+        throw new Error('Fehler beim Zuweisen des Mitarbeiters');
       }
+      const detail = await (await fetch(`/api/customers/${customer.id}`)).json();
+      setCustomer(detail.customer);
+      setAssignTarget('');
+      toast({
+        title: 'Erfolg',
+        description: 'Mitarbeiter wurde erfolgreich zugewiesen'
+      });
+      onUpdated?.();
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Fehler',
+        description: error instanceof Error ? error.message : 'Fehler beim Zuweisen'
+      });
     } finally { setLoading(false); }
   };
 
@@ -127,18 +142,24 @@ export function CustomerDetailModal({ open, onOpenChange, customerId, onUpdated,
               )}
               <div className="flex gap-2">
                 {customer?.email && (
-                  <Button variant="outline" onClick={() => window.location.assign(`mailto:${customer.email}`)}>
-                    <Mail className="w-4 h-4 mr-2" /> E‑Mail
+                  <Button variant="outline" asChild>
+                    <a href={`mailto:${customer.email}`}>
+                      <Mail className="w-4 h-4 mr-2" /> E‑Mail
+                    </a>
                   </Button>
                 )}
                 {customer?.phone && (
-                  <Button variant="outline" onClick={() => window.location.assign(`tel:${customer.phone}`)}>
-                    <Phone className="w-4 h-4 mr-2" /> Anrufen
+                  <Button variant="outline" asChild>
+                    <a href={`tel:${customer.phone}`}>
+                      <Phone className="w-4 h-4 mr-2" /> Anrufen
+                    </a>
                   </Button>
                 )}
                 {customer?.website && (
-                  <Button variant="outline" onClick={() => window.location.assign(customer.website.startsWith('http') ? customer.website : `https://${customer.website}`)}>
-                    <Globe className="w-4 h-4 mr-2" /> Website
+                  <Button variant="outline" asChild>
+                    <a href={customer.website.startsWith('http') ? customer.website : `https://${customer.website}`} target="_blank" rel="noopener noreferrer">
+                      <Globe className="w-4 h-4 mr-2" /> Website
+                    </a>
                   </Button>
                 )}
               </div>
@@ -195,7 +216,7 @@ export function CustomerDetailModal({ open, onOpenChange, customerId, onUpdated,
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Schließen</Button>
           {canAssign && (
-            <Button onClick={() => window.location.assign(`/dashboard/crm/${customer?.id}`)}>
+            <Button onClick={() => router.push(`/dashboard/customers/${customer?.id}`)}>
               <Edit className="w-4 h-4 mr-2" /> Öffnen
             </Button>
           )}

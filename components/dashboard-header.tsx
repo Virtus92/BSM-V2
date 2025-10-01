@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
+import { NotificationsBell } from "@/components/notifications/notifications-bell";
 import UserDropdown from "@/components/user-dropdown";
 import { useSidebar } from "@/components/dashboard-sidebar";
 import {
@@ -76,20 +77,7 @@ export default function DashboardHeader() {
           </Button>
 
           {/* Notifications */}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="relative text-slate-300 hover:text-white hover:bg-slate-700/50"
-            onClick={() => {
-              toast({
-                title: "Benachrichtigungen",
-                description: "Feature wird bald verfügbar sein!",
-              });
-            }}
-          >
-            <Bell className="h-4 w-4" />
-            <span className="absolute -top-1 -right-1 h-2 w-2 bg-red-500 rounded-full animate-pulse" />
-          </Button>
+          <NotificationsBell />
 
           {/* User Profile Dropdown */}
           <UserDropdown />

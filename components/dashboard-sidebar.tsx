@@ -11,12 +11,12 @@ import {
   ChevronLeft,
   ChevronRight,
   Shield,
-  Activity,
   Settings,
   UserCheck,
   Database,
   Target,
   MessageSquare,
+  MessageCircle,
   Zap
 } from "lucide-react";
 
@@ -60,6 +60,11 @@ const sidebarItems = [
     icon: MessageSquare
   },
   {
+    name: "Chat-Übersicht",
+    href: "/dashboard/chats",
+    icon: MessageCircle
+  },
+  {
     name: "Automation",
     href: "/dashboard/automation",
     icon: Zap
@@ -73,11 +78,6 @@ const sidebarItems = [
     name: "Tasksmanagement",
     href: "/dashboard/tasks",
     icon: Target
-  },
-  {
-    name: "System Activity",
-    href: "/dashboard/activity",
-    icon: Shield
   },
   {
     name: "System Settings",

@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { CustomerStatus } from '@/lib/shared-types';
-import { logRequestActivity, logCustomerActivity } from '@/lib/utils/activity-logger';
 
 export async function POST(
   request: NextRequest,
@@ -82,17 +81,6 @@ export async function POST(
         );
       }
 
-      // Log the linking activity
-      await logRequestActivity(
-        user.id,
-        'REQUEST_CONVERTED',
-        id,
-        {
-          action: 'linked_to_existing_customer',
-          customer_id: existingCustomer.id,
-          customer_name: existingCustomer.company_name
-        }
-      );
 
       return NextResponse.json({
         success: true,
@@ -167,29 +155,6 @@ export async function POST(
         created_by: user.id
       });
 
-    // Log the conversion activities
-    await Promise.all([
-      logRequestActivity(
-        user.id,
-        'REQUEST_CONVERTED',
-        id,
-        {
-          action: 'converted_to_new_customer',
-          customer_id: newCustomer.id,
-          customer_name: newCustomer.company_name
-        }
-      ),
-      logCustomerActivity(
-        user.id,
-        'CUSTOMER_CREATED',
-        newCustomer.id,
-        {
-          created_from_request: id,
-          company_name: newCustomer.company_name,
-          contact_person: newCustomer.contact_person
-        }
-      )
-    ]);
 
     return NextResponse.json({
       success: true,

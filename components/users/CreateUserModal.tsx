@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -41,6 +43,8 @@ interface CreateUserModalProps {
 }
 
 export function CreateUserModal({ trigger, open: externalOpen, onOpenChange, onUserCreated }: CreateUserModalProps) {
+  const router = useRouter();
+  const { toast } = useToast();
   const [internalOpen, setInternalOpen] = useState(false);
   const open = externalOpen !== undefined ? externalOpen : internalOpen;
   const setOpen = onOpenChange || setInternalOpen;
@@ -139,24 +143,30 @@ export function CreateUserModal({ trigger, open: externalOpen, onOpenChange, onU
         throw new Error(result.error || 'Ein Fehler ist aufgetreten');
       }
 
-      setSuccess('Benutzer wurde erfolgreich erstellt!');
+      toast({
+        title: 'Erfolg',
+        description: 'Benutzer wurde erfolgreich erstellt'
+      });
 
       // Call callback if provided
       if (onUserCreated) {
         onUserCreated(result.user);
       }
 
-      // Wait a moment to show success message, then reset and close
-      setTimeout(() => {
-        resetForm();
-        setOpen(false);
-        if (!onUserCreated) {
-          window.location.reload();
-        }
-      }, 1500);
+      // Reset and close, then refresh
+      resetForm();
+      setOpen(false);
+
+      if (!onUserCreated) {
+        router.refresh();
+      }
 
     } catch (error) {
-      console.error('Error creating user:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Fehler',
+        description: error instanceof Error ? error.message : 'Ein unerwarteter Fehler ist aufgetreten'
+      });
       setError(error instanceof Error ? error.message : 'Ein unerwarteter Fehler ist aufgetreten');
     } finally {
       setLoading(false);

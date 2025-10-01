@@ -52,6 +52,7 @@ async function getHandler(request: NextRequest) {
       created_at
     `)
     .in('status', ['new', 'in_progress'])
+    .is('assigned_to', null)
     .is('converted_to_customer_id', null) // Not yet converted
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);

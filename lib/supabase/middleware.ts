@@ -65,8 +65,27 @@ export async function updateSession(request: NextRequest) {
 
   // IMPORTANT: If you remove getClaims() and you use server-side rendering
   // with the Supabase client, your users may be randomly logged out.
-  const { data } = await supabase.auth.getClaims();
-  const user = data?.claims;
+  let user = null;
+  try {
+    const { data, error } = await supabase.auth.getClaims();
+    if (error) {
+      // If refresh token is invalid, clear cookies and continue
+      if (error.message?.includes('refresh') || error.message?.includes('token')) {
+        console.log('Middleware: Refresh token error, clearing session');
+        // Clear all Supabase cookies
+        allCookies.forEach(cookie => {
+          if (cookie.name.startsWith('sb-')) {
+            supabaseResponse.cookies.delete(cookie.name);
+          }
+        });
+      }
+    } else {
+      user = data?.claims;
+    }
+  } catch (error) {
+    console.log('Middleware: Session check failed', error);
+    user = null;
+  }
 
   if (
     request.nextUrl.pathname !== "/" &&

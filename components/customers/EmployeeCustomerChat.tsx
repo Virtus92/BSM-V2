@@ -114,30 +114,32 @@ export function EmployeeCustomerChat({
           filter: `customer_id=eq.${customer.id}`
         },
         async (payload) => {
-          // Fetch the complete message with user profile
+          console.log('WorkspaceChat[realtime]: INSERT on customer_chat_messages id=', (payload?.new as any)?.id, 'cust=', customer.id);
+          // Fetch the complete message
           const { data: newMessage } = await supabase
             .from('customer_chat_messages')
-            .select(`
-              id,
-              message,
-              created_at,
-              is_from_customer,
-              sender_id,
-              user_profiles!customer_chat_messages_sender_id_fkey(
-                first_name,
-                last_name,
-                email
-              )
-            `)
+            .select('id, message, created_at, is_from_customer, sender_id')
             .eq('id', payload.new.id)
             .single();
 
+          // Fetch sender profile
           if (newMessage) {
+            const { data: profile } = await supabase
+              .from('user_profiles')
+              .select('first_name, last_name')
+              .eq('id', newMessage.sender_id)
+              .maybeSingle();
+            (newMessage as any).user_profiles = profile;
+          }
+
+          if (newMessage) {
+            console.log('WorkspaceChat[realtime]: fetched new message for UI id=', newMessage.id);
             setMessages(prev => [...prev, newMessage]);
           }
         }
       )
       .subscribe((status) => {
+        console.log('WorkspaceChat[realtime]: subscription status=', status);
         setIsConnected(status === 'SUBSCRIBED');
       });
 
@@ -161,8 +163,17 @@ export function EmployeeCustomerChat({
         });
 
       if (error) throw error;
+      console.log('WorkspaceChat[send]: inserted message for customer=', customer.id);
 
       setNewMessage('');
+      try {
+        const res = await fetch('/api/notifications/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ customerId: customer.id, isFromCustomer: false })
+        });
+        console.log('WorkspaceChat[notify]: POST /api/notifications/chat status=', res.status);
+      } catch (_) {}
     } catch (error) {
       console.error('Error sending message:', error);
     } finally {
@@ -223,20 +234,20 @@ export function EmployeeCustomerChat({
   const assignedEmployee = customer.user_profiles;
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="min-h-screen p-4 md:p-6 space-y-4 md:space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <Link href="/dashboard/customers/chat">
-          <Button variant="ghost" size="sm">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+        <Link href="/workspace/customers/chat">
+          <Button variant="ghost" size="sm" className="w-full sm:w-auto">
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Zurück zur Übersicht
+            Zurück
           </Button>
         </Link>
         <div className="flex-1">
-          <h1 className="text-3xl font-bold tracking-tight">
+          <h1 className="text-xl md:text-3xl font-bold tracking-tight">
             Chat mit {customer.company_name}
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-sm text-muted-foreground hidden sm:block">
             Direkte Kommunikation mit Ihrem Kunden
           </p>
         </div>
@@ -247,27 +258,27 @@ export function EmployeeCustomerChat({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
         {/* Chat Area */}
-        <div className="lg:col-span-2">
-          <Card className="h-[600px] flex flex-col">
-            <CardHeader className="border-b">
-              <CardTitle className="flex items-center gap-2">
-                <MessageCircle className="w-5 h-5" />
+        <div className="lg:col-span-2 order-1 lg:order-none">
+          <Card className="h-[500px] md:h-[600px] flex flex-col">
+            <CardHeader className="border-b p-3 md:p-6">
+              <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+                <MessageCircle className="w-4 h-4 md:w-5 md:h-5" />
                 Chat-Verlauf
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-xs md:text-sm">
                 Echtzeit-Kommunikation mit {customer.contact_person}
               </CardDescription>
             </CardHeader>
 
             {/* Messages Area */}
-            <CardContent className="flex-1 p-4 overflow-y-auto">
-              <div className="space-y-4">
+            <CardContent className="flex-1 p-2 md:p-4 overflow-y-auto">
+              <div className="space-y-3 md:space-y-4">
                 {messages.length === 0 ? (
                   <div className="text-center py-8">
-                    <MessageCircle className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-                    <p className="text-muted-foreground">
+                    <MessageCircle className="w-12 h-12 md:w-16 md:h-16 mx-auto text-muted-foreground mb-4" />
+                    <p className="text-sm md:text-base text-muted-foreground">
                       Noch keine Nachrichten. Starten Sie eine Unterhaltung!
                     </p>
                   </div>
@@ -275,7 +286,7 @@ export function EmployeeCustomerChat({
                   messages.map((message) => (
                     <div
                       key={message.id}
-                      className={`flex gap-3 ${
+                      className={`flex gap-2 md:gap-3 ${
                         message.is_from_customer ? 'justify-start' : 'justify-end'
                       }`}
                     >
@@ -288,7 +299,7 @@ export function EmployeeCustomerChat({
                       )}
 
                       <div
-                        className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                        className={`max-w-[75%] sm:max-w-xs lg:max-w-md px-3 md:px-4 py-2 rounded-lg ${
                           message.is_from_customer
                             ? 'bg-slate-100 text-slate-900'
                             : 'bg-blue-600 text-white'
@@ -299,7 +310,7 @@ export function EmployeeCustomerChat({
                             {customer.contact_person}
                           </p>
                         )}
-                        <p className="text-sm">{message.message}</p>
+                        <p className="text-sm break-words">{message.message}</p>
                         <p className={`text-xs mt-1 ${message.is_from_customer ? 'text-slate-500' : 'text-blue-100'}`}>
                           {formatMessageTime(message.created_at)}
                         </p>
@@ -323,18 +334,21 @@ export function EmployeeCustomerChat({
             </CardContent>
 
             {/* Message Input */}
-            <div className="border-t p-4">
+            <div className="border-t p-2 md:p-4">
               <div className="flex gap-2">
                 <Input
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
                   onKeyPress={handleKeyPress}
-                  placeholder="Nachricht eingeben..."
+                  placeholder="Nachricht..."
                   disabled={loading}
+                  className="text-sm md:text-base"
                 />
                 <Button
                   onClick={sendMessage}
                   disabled={loading || !newMessage.trim()}
+                  size="sm"
+                  className="md:size-default"
                 >
                   <Send className="w-4 h-4" />
                 </Button>
@@ -344,7 +358,7 @@ export function EmployeeCustomerChat({
         </div>
 
         {/* Sidebar */}
-        <div className="space-y-6">
+        <div className="space-y-4 md:space-y-6 order-2 lg:order-none">
           {/* Customer Info */}
           <Card>
             <CardHeader>
@@ -447,7 +461,7 @@ export function EmployeeCustomerChat({
                       </div>
                     </div>
                   ))}
-                  <Link href={`/dashboard/requests?customer=${customer.id}`}>
+                  <Link href={`/workspace/requests?customer=${customer.id}`}>
                     <Button variant="outline" size="sm" className="w-full">
                       Alle Anfragen anzeigen
                     </Button>
@@ -470,7 +484,7 @@ export function EmployeeCustomerChat({
               <CardTitle>Schnellaktionen</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              <Link href={`/dashboard/customers/${customer.id}`}>
+              <Link href={`/workspace/customers/${customer.id}`}>
                 <Button variant="outline" className="w-full justify-start">
                   <User className="w-4 h-4 mr-2" />
                   Kundenprofil anzeigen

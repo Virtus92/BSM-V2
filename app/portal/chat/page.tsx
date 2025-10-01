@@ -8,21 +8,24 @@ export default async function CustomerChatPage() {
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
   if (authError || !user) {
+    console.log('PortalChat[auth]: no user, authError=', !!authError);
     redirect('/auth/login');
   }
 
   // Check if user is customer
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from('user_profiles')
     .select('user_type, first_name, last_name')
     .eq('id', user.id)
     .single();
 
   if (!profile) {
+    console.log('PortalChat[profile]: missing profile for user', user.id, 'error=', profileError?.message);
     redirect('/auth/login');
   }
 
   if (profile.user_type !== 'customer') {
+    console.log('PortalChat[guard]: non-customer user_type=', profile.user_type, 'redirecting');
     // Redirect non-customers to their appropriate area
     if (profile.user_type === 'employee') {
       redirect('/workspace');
@@ -33,64 +36,70 @@ export default async function CustomerChatPage() {
     }
   }
 
-  // Get customer data with assigned employee
-  const admin = createAdminClient();
-  const { data: customer } = await admin
-    .from('customers')
-    .select(`
-      id,
-      company_name,
-      contact_person,
-      email,
-      phone,
-      assigned_employee_id,
-      status,
-      created_at,
-      user_profiles!customers_assigned_employee_id_fkey(
-        id,
-        first_name,
-        last_name,
-        email
-      )
-    `)
-    .eq('user_id', user.id)
-    .single();
+  // Get customer data (with assigned employee for display)
+  console.log('PortalChat[user]: user.id=', user.id);
 
-  if (!customer) {
-    redirect('/auth/login?error=no_customer_account');
+  const { data: customerRow, error: customerError } = await supabase
+    .from('customers')
+    .select('id, company_name, contact_person, email, phone, assigned_employee_id, status, created_at')
+    .eq('user_id', user.id)
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!customerRow) {
+    // Debug: check if row exists via admin (RLS bypass) to diagnose policy issues
+    try {
+      const admin = createAdminClient();
+      const { data: adminCheck, error: adminCheckErr } = await admin
+        .from('customers')
+        .select('id, user_id, assigned_employee_id, status')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      console.log('PortalChat[debug]: supabase user fetch returned none. error=', customerError?.message, 'adminCheck.exists=', !!adminCheck, 'adminCheck.error=', adminCheckErr?.message);
+    } catch (e) {
+      console.log('PortalChat[debug]: adminCheck failed', (e as Error).message);
+    }
+  } else {
+    console.log('PortalChat[customers]: found customer id=', customerRow.id, 'assigned_employee_id=', customerRow.assigned_employee_id || 'none');
   }
 
-  // Get chat messages
-  const { data: chatMessages } = await admin
-    .from('customer_chat_messages')
-    .select(`
-      id,
-      message,
-      created_at,
-      is_from_customer,
-      sender_id,
-      user_profiles!customer_chat_messages_sender_id_fkey(
-        first_name,
-        last_name,
-        email
-      )
-    `)
-    .eq('customer_id', customer.id)
-    .order('created_at', { ascending: true });
+  if (!customerRow) {
+    console.log('PortalChat[redirect]: no customer row for user -> /customer-setup');
+    redirect('/customer-setup');
+  }
 
-  // Get available employees for assignment
-  const { data: availableEmployees } = await admin
-    .from('user_profiles')
-    .select('id, first_name, last_name, email')
-    .eq('user_type', 'employee')
-    .eq('is_active', true)
-    .order('first_name');
+  // Fetch assigned employee profile if exists
+  if (customerRow.assigned_employee_id) {
+    const { data: employeeProfile, error: empError } = await supabase
+      .from('user_profiles')
+      .select('id, first_name, last_name')
+      .eq('id', customerRow.assigned_employee_id)
+      .maybeSingle();
+
+    console.log('PortalChat[employee]:', {
+      employeeId: customerRow.assigned_employee_id,
+      found: !!employeeProfile,
+      profile: employeeProfile,
+      error: empError?.message || 'none'
+    });
+
+    (customerRow as any).user_profiles = employeeProfile;
+  }
+
+  // No auto-assignment workarounds; if no employee assigned, chat input stays disabled in UI
+  // Note: Chat messages are now fetched by the component based on active channel
+
+  console.log('PortalChat[ready]: customer id=', customerRow.id, 'has employee=', !!customerRow.assigned_employee_id);
+
+  // Get available employees for assignment (empty for now, not used)
+  const availableEmployees: any[] = [];
 
   return (
     <CustomerChatView
-      customer={customer}
-      chatMessages={chatMessages || []}
-      availableEmployees={availableEmployees || []}
+      customer={customerRow as any}
+      chatMessages={[]} // Component fetches messages by channel
+      availableEmployees={availableEmployees}
       currentUser={user}
     />
   );

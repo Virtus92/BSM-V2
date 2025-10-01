@@ -58,7 +58,7 @@ export function UnifiedUserList({
 
     // Add computed data
     return filtered.map(user => {
-      const roleInfo = getUserRoleInfo(user.profile?.user_type);
+      const roleInfo = getUserRoleInfo(user.profile?.user_type || user.user_type);
       const statusInfo = getUserStatusInfo(user);
       const lastLoginInfo = getLastLoginStatus(user.last_sign_in_at);
       const displayName = getUserDisplayName(user);

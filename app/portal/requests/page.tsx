@@ -115,15 +115,15 @@ export default async function CustomerRequests() {
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white">
       <div className="max-w-6xl mx-auto px-4 py-10">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Meine Anfragen</h1>
             <p className="text-slate-400">
               Übersicht über alle Ihre Kontaktanfragen und deren Status
             </p>
           </div>
-          <Link href="/portal">
-            <Button className="bg-blue-600 hover:bg-blue-500">
+          <Link href="/portal" className="sm:ml-auto">
+            <Button className="w-full sm:w-auto bg-blue-600 hover:bg-blue-500">
               <Plus className="w-4 h-4 mr-2" />
               Neue Anfrage
             </Button>
@@ -200,11 +200,11 @@ export default async function CustomerRequests() {
             {requests && requests.length > 0 ? (
               <div className="space-y-4">
                 {requests.map((request) => (
-                  <div key={request.id} className="border border-slate-700 rounded-lg p-4 hover:border-slate-600 transition-colors">
-                    <div className="flex items-start justify-between mb-3">
+                  <div key={request.id} className="border border-slate-700 rounded-lg p-4 hover:border-slate-600 transition-colors overflow-hidden">
+                    <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3 mb-3">
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-2">
-                          <h3 className="text-lg font-medium text-white truncate">
+                        <div className="flex items-center gap-2 mb-2 flex-wrap">
+                          <h3 className="text-lg font-medium text-white truncate max-w-full">
                             {request.subject || 'Ohne Betreff'}
                           </h3>
                           <Badge variant="secondary" className={getStatusColor(request.status || 'new')}>
@@ -221,7 +221,7 @@ export default async function CustomerRequests() {
                           {request.message}
                         </p>
 
-                        <div className="flex items-center gap-4 text-xs text-slate-500">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs text-slate-500">
                           <div className="flex items-center gap-1">
                             <Calendar className="w-3 h-3" />
                             Erstellt: {new Date(request.created_at).toLocaleDateString('de-DE')}
@@ -235,8 +235,8 @@ export default async function CustomerRequests() {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 ml-4">
-                        <Button variant="outline" size="sm" asChild>
+                      <div className="flex items-center gap-2 md:ml-4">
+                        <Button variant="outline" size="sm" asChild className="w-full md:w-auto">
                           <Link href={`/portal/requests/${request.id}`}>
                             <Eye className="w-4 h-4 mr-1" />
                             Details
@@ -247,7 +247,7 @@ export default async function CustomerRequests() {
 
                     {/* Additional Info */}
                     {(request.company || request.phone) && (
-                      <div className="flex items-center gap-4 text-xs text-slate-500 pt-2 border-t border-slate-700">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs text-slate-500 pt-2 border-t border-slate-700">
                         {request.company && (
                           <span>Firma: {request.company}</span>
                         )}

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { CheckSquare, Plus, Clock, Calendar, AlertCircle } from 'lucide-react';
 import { formatUserDate } from '@/lib/user-utils';
+import { ACTIVE_TASK_STATUSES } from '@/lib/task-access-control';
 
 interface Task {
   id: string;
@@ -68,7 +69,7 @@ export function EmployeeTasksWidget() {
     }
   };
 
-  const activeTasks = tasks.filter(t => ['todo', 'in_progress', 'review', 'blocked'].includes(t.status));
+  const activeTasks = tasks.filter(t => ACTIVE_TASK_STATUSES.includes(t.status));
   const urgentTasks = tasks.filter(t => t.priority === 'urgent' && !['done', 'cancelled'].includes(t.status));
 
   if (loading) {

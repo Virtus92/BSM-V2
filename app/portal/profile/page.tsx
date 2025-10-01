@@ -55,7 +55,22 @@ export default async function CustomerProfile() {
     .from('customers')
     .select('*')
     .eq('user_id', user.id)
-    .single();
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  // Fallback to user client if admin did not return a row
+  let customerRow = customer
+  if (!customerRow) {
+    const { data: userCustomer } = await supabase
+      .from('customers')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    customerRow = userCustomer as any
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white">
@@ -119,7 +134,7 @@ export default async function CustomerProfile() {
                       id="email"
                       name="email"
                       type="email"
-                      defaultValue={customer?.email || user.email || ''}
+                    defaultValue={customerRow?.email || user.email || ''}
                       className="bg-slate-800 border-slate-700 text-white"
                       placeholder="ihre@email.de"
                     />
@@ -142,22 +157,63 @@ export default async function CustomerProfile() {
                       id="phone"
                       name="phone"
                       type="tel"
-                      defaultValue={customer?.phone || ''}
+                    defaultValue={customerRow?.phone || ''}
                       className="bg-slate-800 border-slate-700 text-white"
                       placeholder="+49 123 456789"
                     />
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="address" className="text-slate-300">Adresse</Label>
-                    <Textarea
-                      id="address"
-                      name="address"
-                      defaultValue={customer?.address || ''}
-                      className="bg-slate-800 border-slate-700 text-white"
-                      placeholder="Straße, PLZ Ort"
-                      rows={3}
-                    />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="address_line1" className="text-slate-300">Straße und Nr.</Label>
+                      <Input
+                        id="address_line1"
+                        name="address_line1"
+                        defaultValue={customerRow?.address_line1 || ''}
+                        className="bg-slate-800 border-slate-700 text-white"
+                        placeholder="Musterstraße 1"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="address_line2" className="text-slate-300">Adresszusatz</Label>
+                      <Input
+                        id="address_line2"
+                        name="address_line2"
+                        defaultValue={customerRow?.address_line2 || ''}
+                        className="bg-slate-800 border-slate-700 text-white"
+                        placeholder="2. Stock / Top 5"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="postal_code" className="text-slate-300">PLZ</Label>
+                      <Input
+                        id="postal_code"
+                        name="postal_code"
+                        defaultValue={customerRow?.postal_code || ''}
+                        className="bg-slate-800 border-slate-700 text-white"
+                        placeholder="1010"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="city" className="text-slate-300">Stadt</Label>
+                      <Input
+                        id="city"
+                        name="city"
+                        defaultValue={customerRow?.city || ''}
+                        className="bg-slate-800 border-slate-700 text-white"
+                        placeholder="Wien"
+                      />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="country" className="text-slate-300">Land</Label>
+                      <Input
+                        id="country"
+                        name="country"
+                        defaultValue={customerRow?.country || ''}
+                        className="bg-slate-800 border-slate-700 text-white"
+                        placeholder="Österreich"
+                      />
+                    </div>
                   </div>
 
                   <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-500">
@@ -183,7 +239,7 @@ export default async function CustomerProfile() {
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-slate-400">Status</span>
                   <Badge variant="secondary" className="bg-green-500/10 text-green-500">
-                    {customer?.status === 'active' ? 'Aktiv' : customer?.status || 'Unbekannt'}
+                    {customerRow?.status === 'active' ? 'Aktiv' : customerRow?.status || 'Unbekannt'}
                   </Badge>
                 </div>
 
@@ -215,28 +271,33 @@ export default async function CustomerProfile() {
                 <div className="flex items-center gap-2 text-sm">
                   <Mail className="w-4 h-4 text-slate-400" />
                   <span className="text-slate-300">
-                    {customer?.email || user.email || 'Keine E-Mail'}
+                    {customerRow?.email || user.email || 'Keine E-Mail'}
                   </span>
                 </div>
 
-                {customer?.phone && (
+                {customerRow?.phone && (
                   <div className="flex items-center gap-2 text-sm">
                     <Phone className="w-4 h-4 text-slate-400" />
-                    <span className="text-slate-300">{customer.phone}</span>
+                    <span className="text-slate-300">{customerRow.phone}</span>
                   </div>
                 )}
 
-                {customer?.company_name && (
+                {customerRow?.company_name && (
                   <div className="flex items-center gap-2 text-sm">
                     <Building className="w-4 h-4 text-slate-400" />
-                    <span className="text-slate-300">{customer.company_name}</span>
+                    <span className="text-slate-300">{customerRow.company_name}</span>
                   </div>
                 )}
 
-                {customer?.address && (
+                {(customerRow?.address_line1 || customerRow?.city) && (
                   <div className="flex items-center gap-2 text-sm">
                     <MapPin className="w-4 h-4 text-slate-400" />
-                    <span className="text-slate-300">{customer.address}</span>
+                    <span className="text-slate-300">
+                      {customerRow?.address_line1}
+                      {customerRow?.address_line2 ? `, ${customerRow.address_line2}` : ''}
+                      {(customerRow?.postal_code || customerRow?.city) ? `, ${customerRow?.postal_code || ''} ${customerRow?.city || ''}` : ''}
+                      {customerRow?.country ? `, ${customerRow.country}` : ''}
+                    </span>
                   </div>
                 )}
               </CardContent>

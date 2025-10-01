@@ -1,11 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { UserPlus } from 'lucide-react';
 import Link from 'next/link';
 import { RequestConversionModal } from './RequestConversionModal';
-import { useActivityLogger } from '@/lib/hooks/use-activity-logger';
 import type { ContactRequestWithRelations } from '@/lib/shared-types';
 
 interface RequestDetailActionsProps {
@@ -13,8 +13,8 @@ interface RequestDetailActionsProps {
 }
 
 export function RequestDetailActions({ request }: RequestDetailActionsProps) {
+  const router = useRouter();
   const [showConversionModal, setShowConversionModal] = useState(false);
-  const { logClientActivity } = useActivityLogger();
 
   const handleConvertClick = async () => {
     setShowConversionModal(true);
@@ -31,7 +31,7 @@ export function RequestDetailActions({ request }: RequestDetailActionsProps) {
     );
   };
 
-  const handleConversionSuccess = async () => {
+  const handleConversionSuccess = async (customerId: string, action: 'created' | 'linked') => {
     setShowConversionModal(false);
 
     // Log successful conversion
@@ -41,24 +41,34 @@ export function RequestDetailActions({ request }: RequestDetailActionsProps) {
       request.id,
       {
         action: 'request_converted_to_customer',
-        request_subject: request.subject
+        request_subject: request.subject,
+        customer_id: customerId
       }
     );
 
-    // Refresh the page to show updated status
-    window.location.reload();
+    // Navigate to the customer page
+    if (customerId) {
+      const basePath = window.location.pathname.startsWith('/workspace') ? '/workspace' : '/dashboard';
+      router.push(`${basePath}/customers/${customerId}`);
+    }
   };
 
   return (
     <>
       <div className="flex items-center gap-2">
         {request.converted_customer ? (
-          <Link href={`/dashboard/crm/${request.converted_customer.id}`} className="inline-flex">
-            <Button size="sm" variant="outline" className="h-8">
-              <UserPlus className="w-4 h-4 mr-2" />
-              Kunde ansehen
-            </Button>
-          </Link>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8"
+            onClick={() => {
+              const basePath = window.location.pathname.startsWith('/workspace') ? '/workspace' : '/dashboard';
+              router.push(`${basePath}/customers/${request.converted_customer.id}`);
+            }}
+          >
+            <UserPlus className="w-4 h-4 mr-2" />
+            Kunde ansehen
+          </Button>
         ) : (
           <Button size="sm" variant="outline" className="h-8" onClick={handleConvertClick}>
             <UserPlus className="w-4 h-4 mr-2" />

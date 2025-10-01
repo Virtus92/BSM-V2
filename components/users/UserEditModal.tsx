@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -81,6 +83,8 @@ interface UserEditModalProps {
 }
 
 export function UserEditModal({ user, onSave, trigger }: UserEditModalProps) {
+  const router = useRouter();
+  const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -162,17 +166,22 @@ export function UserEditModal({ user, onSave, trigger }: UserEditModalProps) {
           throw new Error(result.error || 'Fehler beim Speichern der Daten');
         }
 
-        setSuccess('Benutzerdaten wurden erfolgreich aktualisiert.');
+        toast({
+          title: 'Erfolg',
+          description: 'Benutzerdaten wurden erfolgreich aktualisiert'
+        });
       }
 
-      // Wait a moment to show success message, then close and reload
-      setTimeout(() => {
-        setOpen(false);
-        window.location.reload();
-      }, 1500);
+      // Close and refresh
+      setOpen(false);
+      router.refresh();
 
     } catch (error) {
-      console.error('Error saving user:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Fehler',
+        description: error instanceof Error ? error.message : 'Ein unerwarteter Fehler ist aufgetreten'
+      });
       setError(error instanceof Error ? error.message : 'Ein unerwarteter Fehler ist aufgetreten');
     } finally {
       setIsSaving(false);

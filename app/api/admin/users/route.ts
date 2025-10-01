@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { logger } from '@/lib/logger';
 
 // GET /api/admin/users - List all users
 export async function GET(request: NextRequest) {
@@ -37,7 +38,11 @@ export async function GET(request: NextRequest) {
     const { data: authUsers, error: listUsersError } = await admin.auth.admin.listUsers();
 
     if (listUsersError) {
-      console.error('Admin users auth error:', listUsersError);
+      logger.error('Failed to fetch auth users', listUsersError, {
+        component: 'API',
+        userId: user.id,
+        metadata: { endpoint: '/api/admin/users', method: 'GET' }
+      });
       return NextResponse.json({ error: 'Failed to fetch auth users' }, { status: 500 });
     }
 
@@ -70,13 +75,25 @@ export async function GET(request: NextRequest) {
     ]);
 
     if (profilesError) {
-      console.error('Profiles error:', profilesError);
+      logger.warn('Profiles fetch error', {
+        component: 'API',
+        userId: user.id,
+        metadata: { endpoint: '/api/admin/users', method: 'GET', error: profilesError.message }
+      });
     }
     if (customersError) {
-      console.error('Customers error:', customersError);
+      logger.warn('Customers fetch error', {
+        component: 'API',
+        userId: user.id,
+        metadata: { endpoint: '/api/admin/users', method: 'GET', error: customersError.message }
+      });
     }
     if (employeesError) {
-      console.error('Employees error:', employeesError);
+      logger.warn('Employees fetch error', {
+        component: 'API',
+        userId: user.id,
+        metadata: { endpoint: '/api/admin/users', method: 'GET', error: employeesError.message }
+      });
     }
 
     // Merge all data together
@@ -140,7 +157,10 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Admin users GET error:', error);
+    logger.error('Admin users GET error', error as Error, {
+      component: 'API',
+      metadata: { endpoint: '/api/admin/users', method: 'GET' }
+    });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -198,7 +218,11 @@ export async function POST(request: NextRequest) {
     });
 
     if (createUserError) {
-      console.error('Auth user creation error:', createUserError);
+      logger.error('Auth user creation error', createUserError, {
+        component: 'API',
+        userId: user.id,
+        metadata: { endpoint: '/api/admin/users', method: 'POST', email }
+      });
       return NextResponse.json({
         error: `Failed to create user: ${createUserError.message}`
       }, { status: 400 });
@@ -220,7 +244,11 @@ export async function POST(request: NextRequest) {
     if (profileError) {
       // Cleanup: delete auth user if profile creation fails
       await admin.auth.admin.deleteUser(authData.user.id);
-      console.error('Profile creation error:', profileError);
+      logger.error('Profile creation error', profileError, {
+        component: 'API',
+        userId: user.id,
+        metadata: { endpoint: '/api/admin/users', method: 'POST', newUserId: authData.user.id, email }
+      });
       return NextResponse.json({
         error: 'Failed to create user profile'
       }, { status: 500 });
@@ -252,7 +280,10 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Admin users POST error:', error);
+    logger.error('Admin users POST error', error as Error, {
+      component: 'API',
+      metadata: { endpoint: '/api/admin/users', method: 'POST' }
+    });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

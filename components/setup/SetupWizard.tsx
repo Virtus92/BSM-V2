@@ -22,7 +22,6 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { User as SupabaseUser } from '@supabase/supabase-js';
-import { useActivityLogger } from '@/lib/hooks/use-activity-logger';
 
 interface SetupWizardProps {
   currentUser: SupabaseUser | null;
@@ -50,7 +49,6 @@ interface SecuritySettings {
 export function SetupWizard({ currentUser }: SetupWizardProps) {
   const router = useRouter();
   const supabase = createClient();
-  const { logClientActivity } = useActivityLogger();
 
   const [currentStep, setCurrentStep] = useState<SetupStep>('welcome');
   const [loading, setLoading] = useState(false);
@@ -146,16 +144,6 @@ export function SetupWizard({ currentUser }: SetupWizardProps) {
 
       if (error) throw error;
 
-      // Log setup completion
-      await logClientActivity(
-        'SETUP_COMPLETE',
-        'system',
-        undefined,
-        {
-          admin_user_id: user.id,
-          security_settings: securitySettings
-        }
-      );
 
       setCurrentStep('complete');
     } catch (err) {

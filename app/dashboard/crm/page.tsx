@@ -44,7 +44,7 @@ export default function CRMPage() {
     if (action === 'create') {
       setShowCreateForm(true);
       // Clean the URL to avoid reopening on back/refresh
-      router.replace('/dashboard/crm');
+      router.replace('/dashboard/customers');
     }
   }, [searchParams, router]);
 
@@ -58,7 +58,7 @@ export default function CRMPage() {
     if (customerToEdit) {
       setEditCustomer(customerToEdit);
       setShowCreateForm(false);
-      router.replace('/dashboard/crm');
+      router.replace('/dashboard/customers');
     }
   }, [searchParams, customers, router]);
 

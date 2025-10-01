@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -350,7 +351,7 @@ const TaskCreateModal = ({
           <span>Neue Aufgabe</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-md">
+      <DialogContent className="w-[95vw] max-w-md sm:max-w-lg overflow-y-auto max-h-[90vh]">
         <DialogHeader>
           <DialogTitle>Neue Aufgabe erstellen</DialogTitle>
           <DialogDescription>
@@ -553,7 +554,7 @@ export function ModernUserDetailView({
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
 
-  const roleInfo = getUserRoleInfo(user.profile?.user_type);
+  const roleInfo = getUserRoleInfo(user.profile?.user_type || user.user_type);
   const displayName = getUserDisplayName(user);
 
   // Debug: Log user data to identify username loading issue
@@ -630,7 +631,7 @@ export function ModernUserDetailView({
       if (adminRes.ok) { const d = await adminRes.json(); const list = d.users || d.data?.users || (Array.isArray(d.data) ? d.data : []); allUsers = allUsers.concat(list || []); }
       setEmployeesForTasks(allUsers.map(u => ({
         id: u.id,
-        name: [u.profile?.first_name, u.profile?.last_name].filter(Boolean).join(' ') || u.email || 'Unbekannt',
+        name: [u.profile?.first_name || u.first_name, u.profile?.last_name || u.last_name].filter(Boolean).join(' ') || u.email || 'Unbekannt',
         email: u.email || ''
       })));
     } catch { setEmployeesForTasks([]); }
@@ -640,10 +641,11 @@ export function ModernUserDetailView({
   const openRequestModal = (req: any) => { setSelectedRequestId(req?.id || null); setRequestModalOpen(true); };
   const openCustomerModal = (customer: any) => { setSelectedCustomerId(customer?.id || null); setCustomerModalOpen(true); };
 
+  const router = useRouter();
   const handleTaskChanged = (updated: any) => {
-    // No-op local update; source of truth via reload
+    // No-op local update; source of truth via refresh
   };
-  const handleTaskUpdated = () => { window.location.reload(); };
+  const handleTaskUpdated = () => { router.refresh(); };
 
   // Conversion is handled inside RequestDetailModal
 
@@ -1501,7 +1503,7 @@ export function ModernUserDetailView({
 
       {/* Assign Customer Modal */}
       <Dialog open={showAssignCustomer} onOpenChange={setShowAssignCustomer}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="w-[95vw] max-w-md sm:max-w-lg overflow-y-auto max-h-[90vh]">
           <DialogHeader>
             <DialogTitle>Kunde zuweisen</DialogTitle>
             <DialogDescription>Weisen Sie einen Kunden einem Benutzer zu.</DialogDescription>
@@ -1536,7 +1538,7 @@ export function ModernUserDetailView({
 
       {/* Assign Request Modal */}
       <Dialog open={showAssignRequest} onOpenChange={setShowAssignRequest}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="w-[95vw] max-w-md sm:max-w-lg overflow-y-auto max-h-[90vh]">
           <DialogHeader>
             <DialogTitle>Anfrage zuweisen</DialogTitle>
             <DialogDescription>Weisen Sie eine Anfrage einem Benutzer zu.</DialogDescription>
@@ -1584,7 +1586,7 @@ export function ModernUserDetailView({
         open={requestModalOpen}
         onOpenChange={setRequestModalOpen}
         requestId={selectedRequestId}
-        onUpdated={() => window.location.reload()}
+        onUpdated={() => router.refresh()}
       />
 
       {/* Customer Detail Modal */}
@@ -1592,7 +1594,7 @@ export function ModernUserDetailView({
         open={customerModalOpen}
         onOpenChange={setCustomerModalOpen}
         customerId={selectedCustomerId}
-        onUpdated={() => window.location.reload()}
+        onUpdated={() => router.refresh()}
       />
     </div>
   );

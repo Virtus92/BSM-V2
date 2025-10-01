@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import type { TablesUpdate } from '@/lib/database.types'
 import { parseAndValidateCustomerUpdate } from '@/lib/utils/api-schemas';
 import { logAuthError } from '@/lib/utils/error-handler';
+import { logger } from '@/lib/logger';
 
 export async function GET(
   request: NextRequest,
@@ -24,18 +24,19 @@ export async function GET(
       );
     }
 
-    // Single-tenant: allow any authenticated user; use admin client for RLS-safe reads
-    const adminClient = createAdminClient();
-
-    // Get customer using admin client (no RLS issues)
-    const { data: customer, error } = await adminClient
+    // Use RLS-enabled query - policies will check access
+    const { data: customer, error } = await supabase
       .from('customers')
       .select('*')
       .eq('id', id)
       .single();
 
     if (error) {
-      console.error('Error fetching customer:', error);
+      logger.error('Error fetching customer', error, {
+        component: 'API',
+        userId: user.id,
+        metadata: { endpoint: `/api/customers/${id}`, method: 'GET', customerId: id }
+      });
       return NextResponse.json(
         { error: 'Customer not found' },
         { status: 404 }
@@ -47,7 +48,10 @@ export async function GET(
     });
 
   } catch (error) {
-    console.error('Customer API error:', error);
+    logger.error('Customer API error', error as Error, {
+      component: 'API',
+      metadata: { endpoint: `/api/customers/[id]`, method: 'GET' }
+    });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -66,8 +70,6 @@ export async function PUT(
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
-    const adminClient = createAdminClient();
 
     // Validate and map client payload to DB schema
     const validation = await parseAndValidateCustomerUpdate(request, id)
@@ -94,7 +96,8 @@ export async function PUT(
     // Notes are now handled via separate customer_notes table
     if (v.tags !== undefined) updateData.tags = v.tags || null
 
-    const { data, error } = await adminClient
+    // Use RLS-enabled update - policies will check write access
+    const { data, error } = await supabase
       .from('customers')
       .update(updateData)
       .eq('id', id)
@@ -102,13 +105,20 @@ export async function PUT(
       .single()
 
     if (error) {
-      console.error('Error updating customer:', error)
+      logger.error('Error updating customer', error, {
+        component: 'API',
+        userId: user.id,
+        metadata: { endpoint: `/api/customers/${id}`, method: 'PUT', customerId: id }
+      });
       return NextResponse.json({ error: 'Failed to update customer' }, { status: 500 })
     }
 
     return NextResponse.json({ success: true, customer: data });
   } catch (error) {
-    console.error('Customers PUT API error:', error);
+    logger.error('Customers PUT API error', error as Error, {
+      component: 'API',
+      metadata: { endpoint: `/api/customers/[id]`, method: 'PUT' }
+    });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -125,21 +135,27 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const adminClient = createAdminClient();
-
-    const { error } = await adminClient
+    // Use RLS-enabled delete - policies will check delete access
+    const { error } = await supabase
       .from('customers')
       .delete()
       .eq('id', id);
 
     if (error) {
-      console.error('Error deleting customer:', error);
+      logger.error('Error deleting customer', error, {
+        component: 'API',
+        userId: user.id,
+        metadata: { endpoint: `/api/customers/${id}`, method: 'DELETE', customerId: id }
+      });
       return NextResponse.json({ error: 'Failed to delete customer' }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Customers DELETE API error:', error);
+    logger.error('Customers DELETE API error', error as Error, {
+      component: 'API',
+      metadata: { endpoint: `/api/customers/[id]`, method: 'DELETE' }
+    });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

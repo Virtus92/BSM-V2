@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getUserAccessibleResources } from '@/lib/task-access-control';
+import { logger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -23,22 +24,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
-    const isAdmin = profile.user_type === 'admin';
-
-    // Get task-based accessible resources for non-admin users
-    let taskAccessibleResources = { customerIds: [], requestIds: [], activeTasks: [] };
-    if (!isAdmin) {
-      taskAccessibleResources = await getUserAccessibleResources(user.id);
-    }
-
     const { searchParams } = new URL(request.url);
-    const unassigned = searchParams.get('unassigned') === 'true';
     const status = searchParams.get('status') || '';
-    const limit = parseInt(searchParams.get('limit') || '50');
+    const limit = parseInt(searchParams.get('limit') || '100');
 
-    const admin = createAdminClient();
-
-    let query = admin
+    // Use RLS-enabled query - policies will handle access control
+    // Employees see: unassigned + assigned to them
+    // Admins see: all
+    let query = supabase
       .from('contact_requests')
       .select(`
         *,
@@ -49,37 +42,8 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false })
       .limit(limit);
 
-    if (unassigned) {
-      // For unassigned requests, we need to exclude those that have active assignments
-      const { data: assignedRequestIds } = await admin
-        .from('request_assignments')
-        .select('contact_request_id')
-        .eq('is_active', true);
-
-      const assignedIds = assignedRequestIds?.map(a => a.contact_request_id) || [];
-      if (assignedIds.length > 0) {
-        query = query.not('id', 'in', `(${assignedIds.join(',')})`);
-      }
-    } else {
-      // For assigned requests, include assignment info
-      query = admin
-        .from('contact_requests')
-        .select(`
-          *,
-          converted_customer:customers!contact_requests_converted_to_customer_id_fkey (
-            id, company_name, contact_person
-          ),
-          request_assignments!inner (
-            id, assigned_to, assigned_at, is_active
-          )
-        `)
-        .eq('request_assignments.is_active', true)
-        .order('created_at', { ascending: false })
-        .limit(limit);
-    }
-
-    if (status && !unassigned) {
-      // Support multiple status values separated by comma (only for assigned requests)
+    // Apply status filter if provided
+    if (status) {
       const statusList = status.split(',').map(s => s.trim());
       if (statusList.length > 1) {
         query = query.in('status', statusList);
@@ -88,30 +52,22 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    let requests, requestsError;
-    if (unassigned) {
-      // Apply status filter after getting unassigned requests
-      if (status) {
-        const statusList = status.split(',').map(s => s.trim());
-        if (statusList.length > 1) {
-          query = query.in('status', statusList);
-        } else {
-          query = query.eq('status', status);
-        }
-      }
-      const result = await query;
-      requests = result.data;
-      requestsError = result.error;
-    } else {
-      const result = await query;
-      requests = result.data;
-      requestsError = result.error;
-    }
+    const { data: requests, error: requestsError } = await query;
 
     if (requestsError) {
-      console.error('Requests fetch error:', requestsError);
-      return NextResponse.json({ error: 'Failed to fetch requests' }, { status: 500 });
+      logger.error('Failed to fetch requests', requestsError, {
+        component: 'API',
+        userId: user.id,
+        metadata: { endpoint: '/api/requests', method: 'GET' }
+      });
+      return NextResponse.json({ error: 'Failed to fetch requests', details: requestsError.message }, { status: 500 });
     }
+
+    logger.info('Requests fetched successfully', {
+      component: 'API',
+      userId: user.id,
+      metadata: { count: requests?.length || 0, endpoint: '/api/requests', method: 'GET' }
+    });
 
     return NextResponse.json({
       requests: requests || [],
@@ -119,7 +75,10 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Requests GET error:', error);
+    logger.error('Requests GET error', error as Error, {
+      component: 'API',
+      metadata: { endpoint: '/api/requests', method: 'GET' }
+    });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -172,7 +131,11 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (createError) {
-      console.error('Request creation error:', createError);
+      logger.error('Failed to create request', createError, {
+        component: 'API',
+        userId: user.id,
+        metadata: { endpoint: '/api/requests', method: 'POST', customer_id, subject }
+      });
       return NextResponse.json({ error: 'Failed to create request' }, { status: 500 });
     }
 
@@ -197,7 +160,10 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Requests POST error:', error);
+    logger.error('Requests POST error', error as Error, {
+      component: 'API',
+      metadata: { endpoint: '/api/requests', method: 'POST' }
+    });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

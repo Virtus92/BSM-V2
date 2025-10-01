@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import type { TablesUpdate } from '@/lib/database.types'
+import { logger } from '@/lib/logger';
 
 export async function GET(
   request: NextRequest,
@@ -21,11 +21,8 @@ export async function GET(
       );
     }
 
-    // Single-tenant: allow any authenticated user; use admin client for RLS-safe reads
-    const adminClient = createAdminClient();
-
-    // Get contact request with notes using admin client (no RLS issues)
-    const { data: request, error } = await adminClient
+    // Use RLS-enabled query - policies will check access
+    const { data: request, error } = await supabase
       .from('contact_requests')
       .select(`
         *,
@@ -44,7 +41,10 @@ export async function GET(
     return NextResponse.json({ request });
 
   } catch (error) {
-    console.error('Get contact request error:', error);
+    logger.error('Get contact request error', error as Error, {
+      component: 'API',
+      metadata: { endpoint: `/api/contact/[id]`, method: 'GET' }
+    });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -70,9 +70,6 @@ export async function PATCH(
       );
     }
 
-    // Single-tenant: allow any authenticated user; use admin client for RLS-safe writes
-    const adminClient = createAdminClient();
-
     const body = await request.json();
     const { status, priority, assigned_to, note } = body as {
       status?: 'new' | 'in_progress' | 'responded' | 'converted' | 'archived'
@@ -81,13 +78,13 @@ export async function PATCH(
       note?: string
     };
 
-    // Update contact request using admin client (no RLS issues)
+    // Update contact request - RLS will check write access
     const updateData: Partial<TablesUpdate<'contact_requests'>> = {};
     if (status) updateData.status = status;
     if (priority) updateData.priority = priority;
     if (assigned_to !== undefined) updateData.assigned_to = assigned_to;
 
-    const { data: updatedRequest, error } = await adminClient
+    const { data: updatedRequest, error } = await supabase
       .from('contact_requests')
       .update(updateData)
       .eq('id', id)
@@ -95,24 +92,28 @@ export async function PATCH(
       .single();
 
     if (error) {
-      console.error('Error updating contact request:', error);
+      logger.error('Error updating contact request', error, {
+        component: 'API',
+        userId: user.id,
+        metadata: { endpoint: `/api/contact/${id}`, method: 'PATCH', contactId: id }
+      });
       return NextResponse.json(
         { error: 'Failed to update contact request' },
         { status: 500 }
       );
     }
 
-    // Add note if provided using admin client (no RLS issues)
-      if (note && note.trim()) {
-        await adminClient
-          .from('contact_request_notes')
-          .insert({
+    // Add note if provided - RLS will check write access
+    if (note && note.trim()) {
+      await supabase
+        .from('contact_request_notes')
+        .insert({
           contact_request_id: id,
           content: note.trim(),
           is_internal: true,
           created_by: user.id
         });
-      }
+    }
 
     return NextResponse.json({
       success: true,
@@ -120,7 +121,10 @@ export async function PATCH(
     });
 
   } catch (error) {
-    console.error('Update contact request error:', error);
+    logger.error('Update contact request error', error as Error, {
+      component: 'API',
+      metadata: { endpoint: `/api/contact/[id]`, method: 'PATCH' }
+    });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

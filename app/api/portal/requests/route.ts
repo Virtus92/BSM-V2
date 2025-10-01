@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { notifyAdmins } from '@/lib/services/notification-service'
+import { logger } from '@/lib/logger'
 
 export async function POST(request: NextRequest) {
   try {
@@ -67,9 +69,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to create request' }, { status: 500 })
     }
 
+    // Notify admins about new request
+    try {
+      await notifyAdmins('Neue Kundenanfrage', `${user.email} hat eine neue Anfrage erstellt`, {
+        type: 'request_new',
+        resourceType: 'contact_request',
+        resourceId: data.id,
+        data: { subject, customerId }
+      })
+    } catch (e) {
+      // Non-fatal
+      logger.warn('Failed to create admin notifications for new request', {
+        component: 'API',
+        userId: user.id,
+        metadata: { endpoint: '/api/portal/requests', method: 'POST', requestId: data.id }
+      })
+    }
+
     return NextResponse.json({ success: true, id: data.id })
   } catch (e) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
-

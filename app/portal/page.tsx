@@ -1,44 +1,35 @@
 import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import { CustomerPortalDashboard } from '@/components/portal/CustomerPortalDashboard'
+import { logger } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-async function ensureCustomerRecord(userId: string, email: string | null, fullName?: string | null) {
-  const admin = createAdminClient()
-  // Check if a customer record exists for this user
-  const { data: existing } = await admin
-    .from('customers')
-    .select('id')
-    .eq('user_id', userId)
-    .limit(1)
-    .maybeSingle()
-
-  if (existing?.id) return existing.id
-
-  const companyName = fullName || email || 'Customer'
-  const { data: created } = await admin
-    .from('customers')
-    .insert({
-      company_name: companyName,
-      contact_person: fullName || null,
-      email: email || null,
-      status: 'active',
-      user_id: userId
-    })
-    .select('id')
-    .single()
-
-  return created?.id || null
+interface Customer {
+  id: string;
+  company_name: string;
+  contact_person: string | null;
+  email: string | null;
+  phone: string | null;
+  assigned_employee_id: string | null;
+  status: string;
+  created_at: string;
+  user_profiles?: {
+    id: string;
+    first_name: string;
+    last_name: string;
+  };
 }
 
 export default async function PortalPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) redirect('/auth/login')
+  if (!user) {
+    logger.warn('Unauthorized portal access attempt', { component: 'Portal' })
+    redirect('/auth/login')
+  }
 
   // If the user is admin, go to admin dashboard
   const { data: profile } = await supabase
@@ -55,12 +46,8 @@ export default async function PortalPage() {
     redirect('/workspace')
   }
 
-  // Ensure we have a customer record linked to this user
-  await ensureCustomerRecord(user.id, user.email ?? null, user.user_metadata?.full_name ?? null)
-
-  // Load customer data with assigned employee
-  const admin = createAdminClient()
-  const { data: customer } = await admin
+  // Load customer data using RLS-enabled client
+  const { data: customer, error: customerError } = await supabase
     .from('customers')
     .select(`
       id,
@@ -70,19 +57,49 @@ export default async function PortalPage() {
       phone,
       assigned_employee_id,
       status,
-      created_at,
-      user_profiles!customers_assigned_employee_id_fkey(
-        id,
-        first_name,
-        last_name,
-        email
-      )
+      created_at
     `)
     .eq('user_id', user.id)
-    .single()
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
 
-  // Load own requests
-  const { data: requests } = await admin
+  if (customerError) {
+    logger.error('Failed to load customer data', customerError, {
+      component: 'Portal',
+      userId: user.id
+    })
+  }
+
+  // Fetch assigned employee profile separately if exists
+  if (customer && customer.assigned_employee_id) {
+    const { data: employeeProfile } = await supabase
+      .from('user_profiles')
+      .select('id, first_name, last_name')
+      .eq('id', customer.assigned_employee_id)
+      .maybeSingle()
+
+    if (employeeProfile) {
+      (customer as any).user_profiles = employeeProfile
+    }
+  }
+
+  logger.debug('Portal customer lookup', {
+    component: 'Portal',
+    userId: user.id,
+    metadata: {
+      customerFound: !!customer,
+      profileType: profile?.user_type
+    }
+  })
+
+  // If no customer, redirect to setup
+  if (!customer) {
+    redirect('/customer-setup')
+  }
+
+  // Load requests using RLS-enabled client
+  const { data: requests } = await supabase
     .from('contact_requests')
     .select('id, created_at, status, subject, message, priority')
     .eq('created_by', user.id)
@@ -90,23 +107,32 @@ export default async function PortalPage() {
     .limit(10)
 
   // Load recent chat messages
-  const { data: recentMessages } = await admin
+  const { data: recentMessages } = await supabase
     .from('customer_chat_messages')
     .select(`
       id,
       message,
       created_at,
       is_from_customer,
-      sender_id,
-      user_profiles!customer_chat_messages_sender_id_fkey(
-        first_name,
-        last_name,
-        email
-      )
+      sender_id
     `)
-    .eq('customer_id', customer?.id || '')
+    .eq('customer_id', customer.id)
     .order('created_at', { ascending: false })
     .limit(5)
+
+  // Fetch sender profiles separately
+  if (recentMessages && recentMessages.length > 0) {
+    const senderIds = [...new Set(recentMessages.map(m => m.sender_id))]
+    const { data: profiles } = await supabase
+      .from('user_profiles')
+      .select('id, first_name, last_name, email')
+      .in('id', senderIds)
+
+    const profileMap = new Map(profiles?.map(p => [p.id, p]) || [])
+    recentMessages.forEach((msg: any) => {
+      msg.user_profiles = profileMap.get(msg.sender_id) || null
+    })
+  }
 
   // Get request statistics
   const requestStats = {
@@ -116,13 +142,9 @@ export default async function PortalPage() {
     completed: requests?.filter(r => r.status === 'completed').length || 0
   }
 
-  if (!customer) {
-    redirect('/customer-setup')
-  }
-
   return (
     <CustomerPortalDashboard
-      customer={customer}
+      customer={customer as Customer}
       requests={requests || []}
       requestStats={requestStats}
       recentMessages={recentMessages || []}

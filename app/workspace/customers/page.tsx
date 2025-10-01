@@ -29,7 +29,7 @@ export default function WorkspaceCustomersPage() {
     setSearchTerm,
     setStatusFilter,
     refetch
-  } = useCustomers({ initialFilters: { assignedTo: 'me' } });
+  } = useCustomers({ initialFilters: {} });
 
   const [quickModalCustomer, setQuickModalCustomer] = useState<Customer | null>(null);
   const [editCustomer, setEditCustomer] = useState<Customer | null>(null);

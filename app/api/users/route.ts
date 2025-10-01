@@ -7,6 +7,7 @@ import {
   validateRequiredFields,
   validateEmail
 } from '@/lib/api-response';
+import { logger } from '@/lib/logger';
 
 // GET users with role filtering
 async function getHandler(request: NextRequest) {
@@ -145,7 +146,11 @@ export async function POST(request: NextRequest) {
         }
       });
     } catch (error: any) {
-      console.error('Auth user creation error:', error);
+      logger.error('Auth user creation error', error, {
+        component: 'API',
+        userId: currentUser.id,
+        metadata: { endpoint: '/api/users', method: 'POST', email }
+      });
 
       // Handle specific Supabase errors
       if (error.message?.includes('already registered')) {
@@ -191,12 +196,20 @@ export async function POST(request: NextRequest) {
       });
 
     if (profileError) {
-      console.error('Profile creation error:', profileError);
+      logger.error('Profile creation error', profileError, {
+        component: 'API',
+        userId: currentUser.id,
+        metadata: { endpoint: '/api/users', method: 'POST', newUserId, email }
+      });
       // Try to clean up the auth user if profile creation failed
       try {
         await adminUserOperations.deleteUser(newUserId);
       } catch (cleanupError) {
-        console.error('Cleanup error:', cleanupError);
+        logger.error('Failed to cleanup user after profile creation error', cleanupError as Error, {
+          component: 'API',
+          userId: currentUser.id,
+          metadata: { endpoint: '/api/users', method: 'POST', newUserId }
+        });
       }
       return NextResponse.json({
         error: 'Fehler beim Erstellen des Benutzerprofils. Das Benutzerkonto wurde rückgängig gemacht.'
@@ -219,7 +232,11 @@ export async function POST(request: NextRequest) {
         });
 
       if (employeeError) {
-        console.error('Employee creation error:', employeeError);
+        logger.error('Employee creation error', employeeError, {
+          component: 'API',
+          userId: currentUser.id,
+          metadata: { endpoint: '/api/users', method: 'POST', newUserId, email }
+        });
         return NextResponse.json({
           error: 'Benutzer wurde erstellt, aber Mitarbeiterprofil konnte nicht angelegt werden.'
         }, { status: 500 });
@@ -240,7 +257,11 @@ export async function POST(request: NextRequest) {
         });
 
       if (customerError) {
-        console.error('Customer creation error:', customerError);
+        logger.error('Customer creation error', customerError, {
+          component: 'API',
+          userId: currentUser.id,
+          metadata: { endpoint: '/api/users', method: 'POST', newUserId, email }
+        });
         return NextResponse.json({
           error: 'Benutzer wurde erstellt, aber Kundenprofil konnte nicht angelegt werden.'
         }, { status: 500 });
@@ -257,7 +278,10 @@ export async function POST(request: NextRequest) {
       }
     });
   } catch (error) {
-    console.error('API Error:', error);
+    logger.error('Users API error', error as Error, {
+      component: 'API',
+      metadata: { endpoint: '/api/users', method: 'POST' }
+    });
 
     // Handle JSON parsing errors
     if (error instanceof SyntaxError) {

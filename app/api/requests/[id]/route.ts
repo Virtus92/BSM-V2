@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { logger } from '@/lib/logger';
 
 export async function PATCH(
   request: NextRequest,
@@ -39,10 +39,8 @@ export async function PATCH(
       return NextResponse.json({ error: 'Invalid status value' }, { status: 400 });
     }
 
-    const admin = createAdminClient();
-
-    // Check if request exists
-    const { data: contactRequest, error: requestError } = await admin
+    // Get current request for logging (RLS will check access)
+    const { data: contactRequest, error: requestError } = await supabase
       .from('contact_requests')
       .select('id, subject, status')
       .eq('id', requestId)
@@ -52,8 +50,8 @@ export async function PATCH(
       return NextResponse.json({ error: 'Request not found' }, { status: 404 });
     }
 
-    // Update request status
-    const { data: updatedRequest, error: updateError } = await admin
+    // Update request status (RLS will check write access)
+    const { data: updatedRequest, error: updateError } = await supabase
       .from('contact_requests')
       .update({
         status,
@@ -64,12 +62,16 @@ export async function PATCH(
       .single();
 
     if (updateError) {
-      console.error('Request status update error:', updateError);
+      logger.error('Failed to update request status', updateError, {
+        component: 'API',
+        userId: user.id,
+        metadata: { endpoint: `/api/requests/${requestId}`, method: 'PATCH', requestId, status }
+      });
       return NextResponse.json({ error: 'Failed to update request status' }, { status: 500 });
     }
 
     // Log the status change
-    await admin.from('user_activity_logs').insert({
+    await supabase.from('user_activity_logs').insert({
       user_id: user.id,
       action: 'REQUEST_STATUS_CHANGED',
       resource_type: 'contact_request',
@@ -89,7 +91,10 @@ export async function PATCH(
     });
 
   } catch (error) {
-    console.error('Request status update error:', error);
+    logger.error('Request status update error', error as Error, {
+      component: 'API',
+      metadata: { endpoint: `/api/requests/[id]`, method: 'PATCH' }
+    });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -118,11 +123,8 @@ export async function GET(
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
-    const admin = createAdminClient();
-
-    // Get request with relations
-    // Try full detail shape first (without cross-schema profile embeds)
-    let { data: contactRequest, error: requestError } = await admin
+    // Get request with relations (RLS will check access)
+    let { data: contactRequest, error: requestError } = await supabase
       .from('contact_requests')
       .select(`
         *,
@@ -138,7 +140,7 @@ export async function GET(
 
     // Fallback: minimal shape if embed causes errors
     if (requestError) {
-      const fallback = await admin
+      const fallback = await supabase
         .from('contact_requests')
         .select('*')
         .eq('id', requestId)
@@ -157,7 +159,10 @@ export async function GET(
     });
 
   } catch (error) {
-    console.error('Request GET error:', error);
+    logger.error('Request GET error', error as Error, {
+      component: 'API',
+      metadata: { endpoint: `/api/requests/[id]`, method: 'GET' }
+    });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

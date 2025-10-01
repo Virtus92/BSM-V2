@@ -133,7 +133,6 @@ export function MobileFirstUserDetailView({
         actions.push(
           { icon: Users, label: 'Benutzer', href: '/dashboard/users', color: 'blue' },
           { icon: Shield, label: 'System', href: '/dashboard/admin', color: 'red' },
-          { icon: Activity, label: 'Berichte', href: '/dashboard/activity', color: 'purple' }
         );
         break;
       case 'employee':

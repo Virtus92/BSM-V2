@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useToast } from '@/components/ui/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -52,6 +54,8 @@ interface NewAdminDashboardViewProps {
 }
 
 export function NewAdminDashboardView({ data }: NewAdminDashboardViewProps) {
+  const router = useRouter();
+  const { toast } = useToast();
   const [showCreateUserModal, setShowCreateUserModal] = useState(false);
   const [showSystemReportModal, setShowSystemReportModal] = useState(false);
   const [reportLoading, setReportLoading] = useState(false);
@@ -72,16 +76,18 @@ export function NewAdminDashboardView({ data }: NewAdminDashboardViewProps) {
     setReportLoading(true);
     try {
       const response = await fetch('/api/admin/system-report');
-      if (response.ok) {
-        const data = await response.json();
-        setReportData(data.report);
-        setShowSystemReportModal(true);
-      } else {
-        alert('Fehler beim Generieren des System Reports');
+      if (!response.ok) {
+        throw new Error('Fehler beim Generieren des System Reports');
       }
+      const data = await response.json();
+      setReportData(data.report);
+      setShowSystemReportModal(true);
     } catch (error) {
-      console.error('Error generating system report:', error);
-      alert('Fehler beim Generieren des System Reports');
+      toast({
+        variant: 'destructive',
+        title: 'Fehler',
+        description: error instanceof Error ? error.message : 'Fehler beim Generieren des System Reports'
+      });
     } finally {
       setReportLoading(false);
     }
@@ -95,30 +101,40 @@ export function NewAdminDashboardView({ data }: NewAdminDashboardViewProps) {
         body: JSON.stringify({ format })
       });
 
-      if (response.ok) {
-        if (format === 'csv') {
-          const csvData = await response.text();
-          const blob = new Blob([csvData], { type: 'text/csv' });
-          const url = window.URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `system-report-${new Date().toISOString().split('T')[0]}.csv`;
-          a.click();
-          window.URL.revokeObjectURL(url);
-        } else {
-          const data = await response.json();
-          const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-          const url = window.URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `system-report-${new Date().toISOString().split('T')[0]}.json`;
-          a.click();
-          window.URL.revokeObjectURL(url);
-        }
+      if (!response.ok) {
+        throw new Error('Fehler beim Download des Reports');
       }
+
+      if (format === 'csv') {
+        const csvData = await response.text();
+        const blob = new Blob([csvData], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `system-report-${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+      } else {
+        const data = await response.json();
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `system-report-${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+      }
+
+      toast({
+        title: 'Erfolg',
+        description: 'Report wurde erfolgreich heruntergeladen'
+      });
     } catch (error) {
-      console.error('Error downloading report:', error);
-      alert('Fehler beim Download des Reports');
+      toast({
+        variant: 'destructive',
+        title: 'Fehler',
+        description: error instanceof Error ? error.message : 'Fehler beim Download des Reports'
+      });
     }
   };
 
@@ -438,7 +454,11 @@ export function NewAdminDashboardView({ data }: NewAdminDashboardViewProps) {
           open={showCreateUserModal}
           onOpenChange={setShowCreateUserModal}
           onUserCreated={() => {
-            window.location.reload();
+            toast({
+              title: 'Erfolg',
+              description: 'Benutzer wurde erfolgreich erstellt'
+            });
+            router.refresh();
           }}
         />
       )}

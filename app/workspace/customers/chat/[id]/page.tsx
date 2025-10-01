@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { redirect } from 'next/navigation';
-import { EmployeeCustomerChat } from '@/components/customers/EmployeeCustomerChat';
+import { EmployeeCustomerChatMultiChannel } from '@/components/customers/EmployeeCustomerChatMultiChannel';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -32,51 +32,30 @@ export default async function EmployeeCustomerChatPage({ params }: PageProps) {
   // Get customer data
   const { data: customer } = await admin
     .from('customers')
-    .select(`
-      id,
-      company_name,
-      contact_person,
-      email,
-      phone,
-      status,
-      assigned_employee_id,
-      created_at,
-      user_profiles!customers_assigned_employee_id_fkey(
-        id,
-        first_name,
-        last_name,
-        email
-      )
-    `)
+    .select('id, company_name, contact_person, email, phone, status, assigned_employee_id, created_at')
     .eq('id', id)
     .single();
 
+  // Fetch assigned employee profile separately
+  if (customer?.assigned_employee_id) {
+    const { data: employeeProfile } = await admin
+      .from('user_profiles')
+      .select('id, first_name, last_name')
+      .eq('id', customer.assigned_employee_id)
+      .single();
+    (customer as any).user_profiles = employeeProfile;
+  }
+
   if (!customer) {
-    redirect('/dashboard/customers/chat');
+    redirect('/workspace/customers/chat');
   }
 
-  // Check if employee has access to this customer
+  // Check if employee has access to this customer (admins can see all)
   if (profile.user_type === 'employee' && customer.assigned_employee_id !== user.id) {
-    redirect('/dashboard/customers/chat');
+    redirect('/workspace/customers/chat');
   }
 
-  // Get chat messages
-  const { data: chatMessages } = await admin
-    .from('customer_chat_messages')
-    .select(`
-      id,
-      message,
-      created_at,
-      is_from_customer,
-      sender_id,
-      user_profiles!customer_chat_messages_sender_id_fkey(
-        first_name,
-        last_name,
-        email
-      )
-    `)
-    .eq('customer_id', customer.id)
-    .order('created_at', { ascending: true });
+  // Note: Chat messages are now fetched by the component based on active channel
 
   // Get customer's requests for context
   const { data: customerRequests } = await admin
@@ -94,9 +73,9 @@ export default async function EmployeeCustomerChatPage({ params }: PageProps) {
     .limit(5);
 
   return (
-    <EmployeeCustomerChat
+    <EmployeeCustomerChatMultiChannel
       customer={customer}
-      chatMessages={chatMessages || []}
+      chatMessages={[]} // Component fetches messages by channel
       customerRequests={customerRequests || []}
       currentUser={user}
       userProfile={profile}

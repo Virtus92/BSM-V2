@@ -29,7 +29,7 @@ export default function WorkspaceRequestsPage() {
     convertToCustomer,
     isConvertible,
     formatDate
-  } = useContactRequests({ initialFilters: { assignedTo: 'me', includeUnassigned: false } });
+  } = useContactRequests({ initialFilters: {} });
 
   const [quickModalRequest, setQuickModalRequest] = useState<ContactRequestWithRelations | null>(null);
 
